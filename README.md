@@ -1,0 +1,34 @@
+# Mexaroot
+
+Mexaroot connects Termux, proot environments, and your PC through a single authenticated daemon and command-line client.
+
+Running a command inside a proot distro from your PC, moving files between devices, or keeping a service alive in the background currently means combining SSH, rsync, wake locks, and hand-written proot invocations. Mexaroot replaces that with one protocol and one tool.
+
+## Overview
+
+- **Daemon**: runs in Termux, owns the Android-side lifecycle, authenticates clients, and multiplexes sessions inside a single process.
+- **Runtimes**: a uniform interface over native Termux, proot-distro, and Proroot, so clients do not depend on which one is in use.
+- **Plugins**: optional capabilities such as keep-alive, file transfer, shell access, and desktop sessions, negotiated per connection.
+- **Client**: a command-line tool for the PC and for the device itself.
+
+## Design principles
+
+- One long-lived process instead of many children, to stay within Android's background process limits.
+- A versioned wire protocol with capability negotiation, so older and newer peers interoperate.
+- Secure by default: loopback binding, pairing tokens, and tunneled remote access.
+- Swappable runtimes and transports behind stable interfaces.
+
+## Documentation
+
+- [Architecture decision records](docs/adr/README.md)
+- [Wire protocol](protocol/PROTOCOL.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security policy](SECURITY.md)
+
+## Status
+
+Mexaroot is pre-release. The architecture and wire protocol are documented, and the implementation is under active development.
+
+## License
+
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
