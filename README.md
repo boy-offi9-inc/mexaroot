@@ -25,6 +25,22 @@ Running a command inside a proot distro from your PC, moving files between devic
 - [Contributing](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)
 
+## Development
+
+Mexaroot requires Go 1.22 or later.
+
+```
+go build ./...
+go vet ./...
+go test ./...
+```
+
+Entrypoints live under `cmd/` and internal packages under `internal/`. The version is set at build time:
+
+```
+go build -ldflags "-X github.com/boy-offi9-inc/mexaroot/internal/version.Version=1.0.0" ./cmd/mexarootd
+```
+
 ## Status
 
 Mexaroot is pre-release. The architecture and wire protocol are documented, and the implementation is under active development.

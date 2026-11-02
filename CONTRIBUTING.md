@@ -13,5 +13,6 @@ Contributions are welcome. By submitting one you agree that it is licensed under
 
 - Code is self-explanatory. Add a comment only where the reason for a decision is not evident from the code.
 - Behavior changes include tests.
+- Go code is formatted with `gofmt` and passes `go vet`.
 - Changes to the wire protocol update `protocol/PROTOCOL.md` in the same pull request.
 - Decisions with long-term consequences are recorded as a new ADR under `docs/adr`.
