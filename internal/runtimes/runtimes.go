@@ -45,11 +45,12 @@ type ExecResult struct {
 }
 
 var (
-	ErrEmptyCommand = errors.New("empty command")
-	ErrTimeout      = errors.New("command timed out")
-	ErrNotFound     = errors.New("runtime not found")
-	ErrDuplicate    = errors.New("runtime already registered")
-	ErrNoID         = errors.New("runtime has no id")
+	ErrEmptyCommand    = errors.New("empty command")
+	ErrTimeout         = errors.New("command timed out")
+	ErrNotFound        = errors.New("runtime not found")
+	ErrDuplicate       = errors.New("runtime already registered")
+	ErrNoID            = errors.New("runtime has no id")
+	ErrInvalidArgument = errors.New("invalid argument")
 )
 
 type Runtime interface {
@@ -99,4 +100,25 @@ func (r *Registry) List() []Info {
 	}
 	sort.Slice(infos, func(i, j int) bool { return infos[i].ID < infos[j].ID })
 	return infos
+}
+
+type SessionRequest struct {
+	Argv []string
+	Cwd  string
+	Env  map[string]string
+	Cols int
+	Rows int
+}
+
+type Session interface {
+	Read(p []byte) (int, error)
+	Write(p []byte) (int, error)
+	Resize(cols, rows int) error
+	Close() error
+	Wait() (int, error)
+}
+
+type Interactive interface {
+	Runtime
+	StartSession(ctx context.Context, req SessionRequest) (Session, error)
 }

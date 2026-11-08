@@ -4,7 +4,7 @@ Version 1
 
 ## Transport
 
-Messages are UTF-8 JSON text frames over a WebSocket connection. Bulk file data uses binary frames. The protocol is independent of its transport. The default is WebSocket on a loopback address, reached remotely through an SSH tunnel.
+Messages are UTF-8 JSON text frames over a WebSocket connection. Bulk file data uses binary frames. The protocol is independent of its transport. The default is WebSocket on a loopback address, reached remotely through an SSH tunnel. The daemon serves the endpoint at `/ws` and listens on `127.0.0.1:8750` by default.
 
 ## Envelope
 

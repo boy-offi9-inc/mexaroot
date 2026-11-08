@@ -1,19 +1,14 @@
 package native
 
 import (
-	"bytes"
 	"context"
-	"errors"
-	"fmt"
 	"os"
-	"os/exec"
-	"sort"
-	"time"
 
 	"github.com/boy-offi9-inc/mexaroot/internal/runtimes"
+	"github.com/boy-offi9-inc/mexaroot/internal/runtimes/hostexec"
 )
 
-const waitDelay = 2 * time.Second
+var _ runtimes.Interactive = (*Runtime)(nil)
 
 type Runtime struct {
 	id   string
@@ -37,47 +32,31 @@ func (r *Runtime) Exec(ctx context.Context, req runtimes.ExecRequest) (runtimes.
 	if len(req.Argv) == 0 {
 		return runtimes.ExecResult{}, runtimes.ErrEmptyCommand
 	}
-	if req.Timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, req.Timeout)
-		defer cancel()
-	}
-
-	cmd := exec.CommandContext(ctx, req.Argv[0], req.Argv[1:]...)
-	cmd.Dir = req.Cwd
-	cmd.Env = mergeEnv(req.Env)
-	cmd.WaitDelay = waitDelay
-
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	err := cmd.Run()
-	result := runtimes.ExecResult{Stdout: stdout.Bytes(), Stderr: stderr.Bytes()}
-
-	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		return result, runtimes.ErrTimeout
-	}
-	var exitErr *exec.ExitError
-	if errors.As(err, &exitErr) {
-		result.ExitCode = exitErr.ExitCode()
-		return result, nil
-	}
-	if err != nil {
-		return result, fmt.Errorf("run %s: %w", req.Argv[0], err)
-	}
-	return result, nil
+	return hostexec.Run(ctx, hostexec.Command{
+		Name:    req.Argv[0],
+		Args:    req.Argv[1:],
+		Dir:     req.Cwd,
+		Env:     hostexec.MergeEnv(req.Env),
+		Timeout: req.Timeout,
+	})
 }
 
-func mergeEnv(extra map[string]string) []string {
-	env := os.Environ()
-	keys := make([]string, 0, len(extra))
-	for key := range extra {
-		keys = append(keys, key)
+func (r *Runtime) StartSession(_ context.Context, req runtimes.SessionRequest) (runtimes.Session, error) {
+	argv := req.Argv
+	if len(argv) == 0 {
+		argv = []string{defaultShell()}
 	}
-	sort.Strings(keys)
-	for _, key := range keys {
-		env = append(env, key+"="+extra[key])
+	return hostexec.StartPTY(hostexec.Command{
+		Name: argv[0],
+		Args: argv[1:],
+		Dir:  req.Cwd,
+		Env:  hostexec.MergeEnv(req.Env),
+	}, req.Cols, req.Rows)
+}
+
+func defaultShell() string {
+	if shell := os.Getenv("SHELL"); shell != "" {
+		return shell
 	}
-	return env
+	return "sh"
 }

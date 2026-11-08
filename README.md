@@ -25,6 +25,41 @@ Running a command inside a proot distro from your PC, moving files between devic
 - [Contributing](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)
 
+## Usage
+
+Start the daemon in Termux:
+
+```
+mexarootd
+```
+
+On first start the daemon creates a pairing token and stores it with owner-only permissions. Print it to pair a client:
+
+```
+mexarootd -print-token
+```
+
+Run commands through the client:
+
+```
+mexaroot -token <token> runtimes
+mexaroot -token <token> exec termux -- uname -a
+```
+
+The client also reads the token from `MEXAROOT_TOKEN` or from the file given with `-token-file`.
+
+Installed proot-distro distributions are registered as additional runtimes identified by their alias, for example `mexaroot exec ubuntu -- cat /etc/os-release`.
+
+When a Proroot launcher is on the path, or named by `MEXAROOT_PROROOT`, each distribution is also registered as `<alias>-proroot`, for example `mexaroot exec ubuntu-proroot -- uname -a`.
+
+Open an interactive shell with `mexaroot shell <runtime>`, for example `mexaroot shell ubuntu`. The terminal size, `TERM`, and window resizes are forwarded, and the session ends when the shell exits.
+
+The daemon listens on `127.0.0.1:8750` and refuses other addresses unless `-allow-non-loopback` is set. Reach it from a PC through an SSH tunnel:
+
+```
+ssh -p 8022 -L 8750:127.0.0.1:8750 <phone>
+```
+
 ## Development
 
 Mexaroot requires Go 1.22 or later.
