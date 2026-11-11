@@ -18,6 +18,9 @@ var commands = []commandInfo{
 	{"runtimes", "List the runtimes known to the daemon"},
 	{"exec", "Run a command in a runtime and print its output"},
 	{"shell", "Open an interactive shell, choosing a runtime if none is given"},
+	{"status", "Show the daemon version, capabilities, latency, and runtimes"},
+	{"doctor", "Check the connection step by step and suggest fixes"},
+	{"completion", "Print a shell completion script for bash, zsh, or fish"},
 	{"help", "Show this help"},
 }
 
@@ -25,7 +28,10 @@ var examples = []string{
 	"mexaroot runtimes",
 	"mexaroot exec ubuntu -- uname -a",
 	"mexaroot shell",
-	"mexaroot shell termux",
+	"mexaroot status",
+	"mexaroot doctor",
+	"mexaroot -json runtimes",
+	"source <(mexaroot completion bash)",
 }
 
 func isCommand(name string) bool {
@@ -35,6 +41,14 @@ func isCommand(name string) bool {
 		}
 	}
 	return false
+}
+
+func commandNames() []string {
+	names := make([]string, 0, len(commands))
+	for _, command := range commands {
+		names = append(names, command.name)
+	}
+	return names
 }
 
 func printHelp(w io.Writer, s ui.Styler, fs *flag.FlagSet) {

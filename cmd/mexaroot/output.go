@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -19,6 +20,21 @@ func printError(w io.Writer, s ui.Styler, err error) {
 	if hint := hintFor(err); hint != "" {
 		fmt.Fprintf(w, "  %s\n", s.Dim(hint))
 	}
+}
+
+func printJSONError(w io.Writer, err error) {
+	payload := map[string]string{"message": err.Error()}
+	var werr *wire.Error
+	if errors.As(err, &werr) {
+		payload["code"] = werr.Code
+	}
+	writeJSON(w, map[string]any{"error": payload})
+}
+
+func writeJSON(w io.Writer, v any) error {
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	return enc.Encode(v)
 }
 
 func hintFor(err error) string {

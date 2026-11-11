@@ -22,6 +22,7 @@ type options struct {
 	url         string
 	token       string
 	tokenFile   string
+	json        bool
 	noColor     bool
 	showVersion bool
 }
@@ -32,6 +33,7 @@ func newFlagSet(opts *options) *flag.FlagSet {
 	fs.StringVar(&opts.url, "url", defaultURL, "daemon WebSocket URL")
 	fs.StringVar(&opts.token, "token", "", "pairing token (default: MEXAROOT_TOKEN)")
 	fs.StringVar(&opts.tokenFile, "token-file", "", "file containing the pairing token")
+	fs.BoolVar(&opts.json, "json", false, "print machine-readable JSON where supported")
 	fs.BoolVar(&opts.noColor, "no-color", false, "disable colored output")
 	fs.BoolVar(&opts.showVersion, "version", false, "print the version and exit")
 	return fs
@@ -71,16 +73,31 @@ func execute(args []string) int {
 		return 0
 	}
 
-	code, err := run(opts, rest, out, errOut)
+	code, err := run(opts, fs, rest, out, errOut)
 	if err != nil {
-		printError(os.Stderr, errOut, err)
+		if opts.json {
+			printJSONError(os.Stderr, err)
+		} else {
+			printError(os.Stderr, errOut, err)
+		}
 	}
 	return code
 }
 
-func run(opts options, args []string, out, errOut ui.Styler) (int, error) {
-	if !isCommand(args[0]) {
-		return 2, fmt.Errorf("unknown command %q (run mexaroot help)", args[0])
+func run(opts options, fs *flag.FlagSet, args []string, out, errOut ui.Styler) (int, error) {
+	name := args[0]
+	if !isCommand(name) {
+		return 2, fmt.Errorf("unknown command %q (run mexaroot help)", name)
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
+	switch name {
+	case "completion":
+		return completionCommand(args[1:], fs)
+	case "doctor":
+		return doctorCommand(ctx, opts, out)
 	}
 
 	secret, err := resolveToken(opts.token, opts.tokenFile)
@@ -88,52 +105,60 @@ func run(opts options, args []string, out, errOut ui.Styler) (int, error) {
 		return 1, err
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer stop()
-
 	c, err := client.Connect(ctx, opts.url, secret, "mexaroot/"+version.Version)
 	if err != nil {
 		return 1, err
 	}
 	defer c.Close()
 
-	switch args[0] {
+	switch name {
 	case "runtimes":
-		return listRuntimes(ctx, c, out)
+		return listRuntimes(ctx, c, opts, out)
 	case "exec":
-		return execCommand(ctx, c, args[1:])
+		return execCommand(ctx, c, opts, args[1:])
 	case "shell":
 		return shellCommand(ctx, c, args[1:], errOut)
+	case "status":
+		return statusCommand(ctx, c, opts, out)
 	default:
-		return 2, fmt.Errorf("unknown command %q (run mexaroot help)", args[0])
+		return 2, fmt.Errorf("unknown command %q (run mexaroot help)", name)
 	}
 }
 
-func resolveToken(token, tokenFile string) (string, error) {
+func tokenSource(token, tokenFile string) (string, string, error) {
 	if token != "" {
-		return token, nil
+		return token, "the -token flag", nil
 	}
 	if env := os.Getenv("MEXAROOT_TOKEN"); env != "" {
-		return env, nil
+		return env, "MEXAROOT_TOKEN", nil
 	}
 	if tokenFile == "" {
 		path, err := auth.DefaultPath()
 		if err != nil {
-			return "", err
+			return "", "", err
 		}
 		tokenFile = path
 	}
 	secret, err := auth.Load(tokenFile)
 	if err != nil {
-		return "", fmt.Errorf("read token: %w (use -token, -token-file, or MEXAROOT_TOKEN)", err)
+		return "", "", fmt.Errorf("read token: %w (use -token, -token-file, or MEXAROOT_TOKEN)", err)
 	}
-	return secret, nil
+	return secret, tokenFile, nil
 }
 
-func listRuntimes(ctx context.Context, c *client.Client, s ui.Styler) (int, error) {
+func resolveToken(token, tokenFile string) (string, error) {
+	secret, _, err := tokenSource(token, tokenFile)
+	return secret, err
+}
+
+func listRuntimes(ctx context.Context, c *client.Client, opts options, s ui.Styler) (int, error) {
 	var resp wire.RuntimeListResponse
 	if err := c.Call(ctx, wire.TypeRuntimeList, nil, &resp); err != nil {
 		return 1, err
+	}
+
+	if opts.json {
+		return 0, writeJSON(os.Stdout, resp)
 	}
 
 	if !ui.IsTerminal(os.Stdout) {
@@ -162,7 +187,7 @@ func listRuntimes(ctx context.Context, c *client.Client, s ui.Styler) (int, erro
 	return 0, nil
 }
 
-func execCommand(ctx context.Context, c *client.Client, args []string) (int, error) {
+func execCommand(ctx context.Context, c *client.Client, opts options, args []string) (int, error) {
 	errUsage := errors.New("usage: mexaroot exec <runtime> [--] <command> [args...]")
 	if len(args) < 2 {
 		return 2, errUsage
@@ -180,6 +205,13 @@ func execCommand(ctx context.Context, c *client.Client, args []string) (int, err
 	err := c.Call(ctx, wire.TypeExecRun, wire.ExecRequest{Runtime: target, Argv: argv}, &resp)
 	if err != nil {
 		return 1, err
+	}
+
+	if opts.json {
+		if err := writeJSON(os.Stdout, resp); err != nil {
+			return 1, err
+		}
+		return resp.ExitCode, nil
 	}
 	fmt.Fprint(os.Stdout, resp.Stdout)
 	fmt.Fprint(os.Stderr, resp.Stderr)
