@@ -21,6 +21,8 @@ var ErrClosed = errors.New("connection closed")
 
 type Client struct {
 	Capabilities []string
+	Daemon       string
+	Protocol     int
 
 	conn      *websocket.Conn
 	events    chan wire.Message
@@ -60,6 +62,8 @@ func Connect(ctx context.Context, url, token, name string) (*Client, error) {
 		return nil, err
 	}
 	c.Capabilities = hello.Capabilities
+	c.Daemon = hello.Daemon
+	c.Protocol = hello.Protocol
 	return c, nil
 }
 
