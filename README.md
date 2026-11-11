@@ -56,6 +56,8 @@ Open an interactive shell with `mexaroot shell <runtime>`, for example `mexaroot
 
 Running `mexaroot shell` without a runtime opens a numbered menu of the available runtimes. Output is colored on terminals and plain when piped. Pass `-no-color` or set `NO_COLOR` to disable colors, and `FORCE_COLOR` to keep them in pipes.
 
+`mexaroot status` shows the daemon version, negotiated protocol, capabilities, latency, and runtime counts. `mexaroot doctor` checks the token, address, handshake, capabilities, and runtimes in turn and suggests a fix for each problem. Add `-json` to `runtimes`, `exec`, `status`, or `doctor` for machine-readable output, and load completions with `source <(mexaroot completion bash)`; zsh and fish are supported as well.
+
 The daemon listens on `127.0.0.1:8750` and refuses other addresses unless `-allow-non-loopback` is set. Reach it from a PC through an SSH tunnel:
 
 ```
