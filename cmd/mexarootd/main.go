@@ -15,6 +15,7 @@ import (
 	"github.com/boy-offi9-inc/mexaroot/internal/runtimes/prootdistro"
 	"github.com/boy-offi9-inc/mexaroot/internal/runtimes/proroot"
 	"github.com/boy-offi9-inc/mexaroot/internal/server"
+	"github.com/boy-offi9-inc/mexaroot/internal/ui"
 	"github.com/boy-offi9-inc/mexaroot/internal/version"
 )
 
@@ -25,6 +26,7 @@ func main() {
 	tokenFile := flag.String("token-file", "", "path to the pairing token file")
 	allowRemote := flag.Bool("allow-non-loopback", false, "permit listening on non-loopback addresses")
 	printToken := flag.Bool("print-token", false, "print the pairing token and exit")
+	noColor := flag.Bool("no-color", false, "disable colored output")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
 
@@ -42,7 +44,7 @@ func main() {
 		return
 	}
 
-	if err := serve(*addr, token, *allowRemote); err != nil {
+	if err := serve(*addr, token, *allowRemote, *noColor); err != nil {
 		log.Fatalf("mexarootd: %v", err)
 	}
 }
@@ -97,7 +99,11 @@ func buildRegistry() (*runtimes.Registry, error) {
 	return registry, nil
 }
 
-func serve(addr, token string, allowRemote bool) error {
+func serve(addr, token string, allowRemote, noColor bool) error {
+	styler := ui.New(os.Stderr, noColor)
+	fmt.Fprint(os.Stderr, "\n", styler.Banner("mexarootd", version.Version, "Bridging Termux, proot and your PC"))
+	fmt.Fprintln(os.Stderr)
+
 	registry, err := buildRegistry()
 	if err != nil {
 		return err
@@ -117,6 +123,6 @@ func serve(addr, token string, allowRemote bool) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	log.Printf("mexarootd %s listening on %s", version.Version, addr)
+	fmt.Fprintf(os.Stderr, "\n  %s listening on %s\n\n", styler.Paint(ui.Green, "●"), styler.Bold(addr))
 	return srv.ListenAndServe(ctx)
 }
