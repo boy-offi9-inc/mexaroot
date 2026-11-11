@@ -12,6 +12,7 @@ import (
 	"golang.org/x/term"
 
 	"github.com/boy-offi9-inc/mexaroot/internal/client"
+	"github.com/boy-offi9-inc/mexaroot/internal/ui"
 	"github.com/boy-offi9-inc/mexaroot/internal/wire"
 )
 
@@ -20,24 +21,40 @@ const (
 	endOfTransmission = "\x04"
 )
 
-func shellCommand(ctx context.Context, c *client.Client, args []string) (int, error) {
-	if len(args) < 1 || len(args) > 2 {
-		return 2, errors.New("usage: mexaroot shell <runtime> [shell]")
+var errShellUsage = errors.New("usage: mexaroot shell [runtime] [shell]")
+
+func shellCommand(ctx context.Context, c *client.Client, args []string, styler ui.Styler) (int, error) {
+	if len(args) > 2 {
+		return 2, errShellUsage
 	}
 	if !slices.Contains(c.Capabilities, wire.CapabilitySession) {
 		return 1, errors.New("the daemon does not offer interactive sessions")
 	}
 
-	req := wire.SessionStartRequest{Runtime: args[0], Cols: 80, Rows: 24}
+	fd := int(os.Stdin.Fd())
+	interactive := term.IsTerminal(fd)
+
+	var target string
+	switch {
+	case len(args) > 0:
+		target = args[0]
+	case interactive:
+		chosen, err := chooseRuntime(ctx, c, styler)
+		if err != nil {
+			return 1, err
+		}
+		target = chosen
+	default:
+		return 2, errShellUsage
+	}
+
+	req := wire.SessionStartRequest{Runtime: target, Cols: 80, Rows: 24}
 	if len(args) == 2 {
 		req.Shell = args[1]
 	}
 	if termName := os.Getenv("TERM"); termName != "" {
 		req.Env = map[string]string{"TERM": termName}
 	}
-
-	fd := int(os.Stdin.Fd())
-	interactive := term.IsTerminal(fd)
 	if interactive {
 		if cols, rows, err := term.GetSize(fd); err == nil {
 			req.Cols, req.Rows = cols, rows
