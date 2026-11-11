@@ -54,6 +54,8 @@ When a Proroot launcher is on the path, or named by `MEXAROOT_PROROOT`, each dis
 
 Open an interactive shell with `mexaroot shell <runtime>`, for example `mexaroot shell ubuntu`. The terminal size, `TERM`, and window resizes are forwarded, and the session ends when the shell exits.
 
+Running `mexaroot shell` without a runtime opens a numbered menu of the available runtimes. Output is colored on terminals and plain when piped. Pass `-no-color` or set `NO_COLOR` to disable colors, and `FORCE_COLOR` to keep them in pipes.
+
 The daemon listens on `127.0.0.1:8750` and refuses other addresses unless `-allow-non-loopback` is set. Reach it from a PC through an SSH tunnel:
 
 ```
