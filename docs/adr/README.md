@@ -12,5 +12,6 @@
 | [0008](0008-proroot-backend.md) | Proroot as an optional backend over proot-distro rootfs |
 | [0009](0009-interactive-sessions-over-pseudo-terminals.md) | Interactive sessions over pseudo-terminals |
 | [0010](0010-command-line-output-contract.md) | Command-line output contract |
+| [0011](0011-staying-alive-on-android.md) | Staying alive under Android background limits |
 
 Each record states its context, the decision taken, and the resulting consequences. A superseded record keeps its place and is marked with the record that replaces it.

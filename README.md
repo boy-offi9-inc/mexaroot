@@ -64,6 +64,35 @@ The daemon listens on `127.0.0.1:8750` and refuses other addresses unless `-allo
 ssh -p 8022 -L 8750:127.0.0.1:8750 <phone>
 ```
 
+## Keeping the daemon running
+
+The daemon holds a Termux wake lock while it runs, so the CPU stays awake with the screen off. Use `-wake-lock=false` to turn that off.
+
+To restart it automatically after a crash, run it under termux-services:
+
+```
+pkg install termux-services
+mexarootd -install-service
+sv-enable mexarootd
+```
+
+Restart Termux after installing termux-services so its service daemon starts. The service is installed disabled, `sv-disable mexarootd` stops it, and its logs are in `$PREFIX/var/log/sv/mexarootd/current`. `mexarootd -uninstall-service` removes it once it is disabled.
+
+Android 12 and later also kill background child processes. On Android 14 and newer, turn on Developer options, then Disable child process restrictions. On Android 12L and 13, run this on a computer with USB debugging enabled:
+
+```
+adb shell settings put global settings_enable_monitor_phantom_procs false
+```
+
+On Android 12, Termux's documentation lists these commands instead:
+
+```
+adb shell "/system/bin/device_config set_sync_disabled_for_tests persistent"
+adb shell "/system/bin/device_config put activity_manager max_phantom_processes 2147483647"
+```
+
+Also set Termux's battery usage to unrestricted in the system settings.
+
 ## Development
 
 Mexaroot requires Go 1.22 or later.
