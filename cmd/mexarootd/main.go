@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -10,6 +11,7 @@ import (
 	"syscall"
 
 	"github.com/boy-offi9-inc/mexaroot/internal/auth"
+	"github.com/boy-offi9-inc/mexaroot/internal/keepalive"
 	"github.com/boy-offi9-inc/mexaroot/internal/runtimes"
 	"github.com/boy-offi9-inc/mexaroot/internal/runtimes/native"
 	"github.com/boy-offi9-inc/mexaroot/internal/runtimes/prootdistro"
@@ -21,30 +23,41 @@ import (
 
 const defaultAddr = "127.0.0.1:8750"
 
+type options struct {
+	addr        string
+	tokenFile   string
+	allowRemote bool
+	noColor     bool
+	wakeLock    bool
+}
+
 func main() {
-	addr := flag.String("addr", defaultAddr, "address to listen on")
-	tokenFile := flag.String("token-file", "", "path to the pairing token file")
-	allowRemote := flag.Bool("allow-non-loopback", false, "permit listening on non-loopback addresses")
+	var opts options
+	flag.StringVar(&opts.addr, "addr", defaultAddr, "address to listen on")
+	flag.StringVar(&opts.tokenFile, "token-file", "", "path to the pairing token file")
+	flag.BoolVar(&opts.allowRemote, "allow-non-loopback", false, "permit listening on non-loopback addresses")
+	flag.BoolVar(&opts.noColor, "no-color", false, "disable colored output")
+	flag.BoolVar(&opts.wakeLock, "wake-lock", true, "hold a Termux wake lock while running")
 	printToken := flag.Bool("print-token", false, "print the pairing token and exit")
-	noColor := flag.Bool("no-color", false, "disable colored output")
+	installService := flag.Bool("install-service", false, "install a termux-services service and exit")
+	uninstallService := flag.Bool("uninstall-service", false, "remove the termux-services service and exit")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
 
-	if *showVersion {
+	var err error
+	switch {
+	case *showVersion:
 		fmt.Println(version.Version)
-		return
+	case *installService:
+		err = installServiceCommand(opts)
+	case *uninstallService:
+		err = uninstallServiceCommand(opts)
+	case *printToken:
+		err = printTokenCommand(opts)
+	default:
+		err = serve(opts)
 	}
-
-	token, err := loadToken(*tokenFile)
 	if err != nil {
-		log.Fatalf("mexarootd: %v", err)
-	}
-	if *printToken {
-		fmt.Println(token)
-		return
-	}
-
-	if err := serve(*addr, token, *allowRemote, *noColor); err != nil {
 		log.Fatalf("mexarootd: %v", err)
 	}
 }
@@ -58,6 +71,15 @@ func loadToken(path string) (string, error) {
 		path = defaultPath
 	}
 	return auth.LoadOrCreate(path)
+}
+
+func printTokenCommand(opts options) error {
+	token, err := loadToken(opts.tokenFile)
+	if err != nil {
+		return err
+	}
+	fmt.Println(token)
+	return nil
 }
 
 func register(registry *runtimes.Registry, rt runtimes.Runtime) {
@@ -99,10 +121,37 @@ func buildRegistry() (*runtimes.Registry, error) {
 	return registry, nil
 }
 
-func serve(addr, token string, allowRemote, noColor bool) error {
-	styler := ui.New(os.Stderr, noColor)
+func acquireWakeLock(styler ui.Styler) func() {
+	lock := keepalive.New()
+	switch err := lock.Acquire(); {
+	case err == nil:
+		fmt.Fprintf(os.Stderr, "  %s wake lock held\n", styler.Paint(ui.Green, "●"))
+	case errors.Is(err, keepalive.ErrUnavailable):
+		fmt.Fprintf(os.Stderr, "  %s %s\n", styler.Paint(ui.Gray, "○"), styler.Dim("wake lock unavailable (termux-wake-lock not found)"))
+	default:
+		fmt.Fprintf(os.Stderr, "  %s %s\n", styler.Paint(ui.Yellow, "!"), styler.Dim(err.Error()))
+	}
+	return func() {
+		if err := lock.Release(); err != nil && !errors.Is(err, keepalive.ErrUnavailable) {
+			log.Printf("release wake lock: %v", err)
+		}
+	}
+}
+
+func serve(opts options) error {
+	token, err := loadToken(opts.tokenFile)
+	if err != nil {
+		return err
+	}
+
+	styler := ui.New(os.Stderr, opts.noColor)
 	fmt.Fprint(os.Stderr, "\n", styler.Banner("mexarootd", version.Version, "Bridging Termux, proot and your PC"))
 	fmt.Fprintln(os.Stderr)
+
+	if opts.wakeLock {
+		release := acquireWakeLock(styler)
+		defer release()
+	}
 
 	registry, err := buildRegistry()
 	if err != nil {
@@ -110,11 +159,11 @@ func serve(addr, token string, allowRemote, noColor bool) error {
 	}
 
 	srv, err := server.New(server.Config{
-		Addr:             addr,
+		Addr:             opts.addr,
 		Token:            token,
 		Version:          version.Version,
 		Registry:         registry,
-		AllowNonLoopback: allowRemote,
+		AllowNonLoopback: opts.allowRemote,
 	})
 	if err != nil {
 		return err
@@ -123,6 +172,6 @@ func serve(addr, token string, allowRemote, noColor bool) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	fmt.Fprintf(os.Stderr, "\n  %s listening on %s\n\n", styler.Paint(ui.Green, "●"), styler.Bold(addr))
+	fmt.Fprintf(os.Stderr, "\n  %s listening on %s\n\n", styler.Paint(ui.Green, "●"), styler.Bold(opts.addr))
 	return srv.ListenAndServe(ctx)
 }
