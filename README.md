@@ -58,6 +58,15 @@ Running `mexaroot shell` without a runtime opens a numbered menu of the availabl
 
 `mexaroot status` shows the daemon version, negotiated protocol, capabilities, latency, and runtime counts. `mexaroot doctor` checks the token, address, handshake, capabilities, and runtimes in turn and suggests a fix for each problem. Add `-json` to `runtimes`, `exec`, `status`, or `doctor` for machine-readable output, and load completions with `source <(mexaroot completion bash)`; zsh and fish are supported as well.
 
+Copy files between the PC and a runtime:
+
+```
+mexaroot push ubuntu report.pdf /root/report.pdf
+mexaroot pull ubuntu /root/report.pdf report.pdf
+```
+
+The remote path resolves inside the runtime's file system, so `/root/report.pdf` lands in the distro's root rather than on the Android host. Paths that escape the runtime root are refused, and the daemon verifies the byte count and SHA-256 digest of every transfer. Transfers are capped at 256 MiB.
+
 The daemon listens on `127.0.0.1:8750` and refuses other addresses unless `-allow-non-loopback` is set. Reach it from a PC through an SSH tunnel:
 
 ```

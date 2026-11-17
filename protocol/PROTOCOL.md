@@ -132,7 +132,9 @@ The daemon emits `session.output` events with `data` (base64) and a `session.exi
 
 ## File transfer
 
-Streams are unsigned 32-bit integers assigned by the daemon. A binary frame carries a 4-byte big-endian stream number followed by the chunk data. Chunk data should not exceed 65536 bytes. A frame with no chunk data marks the end of the stream.
+File paths are resolved relative to the runtime's file system. The native runtime maps to the host file system, while proot-based runtimes map to their root file system directory. Absolute paths are resolved as they are; relative paths are resolved against the runtime root. A path that escapes the runtime root, such as `../escape`, is rejected with `invalid_request`.
+
+Streams are unsigned 32-bit integers assigned by the daemon. A binary frame carries a 4-byte big-endian stream number followed by the chunk data. Chunk data should not exceed 65536 bytes. A frame with no chunk data marks the end of the stream. A transfer may carry at most 268435456 bytes (256 MiB).
 
 `file.push` request payload:
 
@@ -146,7 +148,7 @@ Streams are unsigned 32-bit integers assigned by the daemon. A binary frame carr
 }
 ```
 
-The response payload contains the `stream` to write to. After the final frame the daemon verifies `size` and `sha256` and emits a `file.done` event with `ok` and, on failure, an `error`.
+`size` is the exact byte count to receive and `sha256` the digest of the complete content; both are verified by the daemon. `mode` is optional and carries the file permission bits (default 0644). The response payload contains the `stream` to write to. After the final frame the daemon verifies `size` and `sha256` and emits a `file.done` event with `ok` and, on failure, an `error`. A failed transfer leaves no partial file behind.
 
 `file.pull` request payload:
 
@@ -157,7 +159,7 @@ The response payload contains the `stream` to write to. After the final frame th
 }
 ```
 
-The response payload contains `stream`, `size`, `sha256`, and `mode`. The daemon then sends binary frames on that stream and ends it with an empty frame.
+The response payload contains `stream`, `size`, `sha256`, and `mode`. The daemon then sends binary frames on that stream and ends it with an empty frame. A pull of a missing path returns `not_found`; a pull of a directory returns `invalid_request`.
 
 ## Keepalive
 
