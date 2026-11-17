@@ -116,6 +116,10 @@ func run(opts options, fs *flag.FlagSet, args []string, out, errOut ui.Styler) (
 		return listRuntimes(ctx, c, opts, out)
 	case "exec":
 		return execCommand(ctx, c, opts, args[1:])
+	case "push":
+		return pushCommand(ctx, c, args[1:])
+	case "pull":
+		return pullCommand(ctx, c, args[1:])
 	case "shell":
 		return shellCommand(ctx, c, args[1:], errOut)
 	case "status":

@@ -17,6 +17,8 @@ type commandInfo struct {
 var commands = []commandInfo{
 	{"runtimes", "List the runtimes known to the daemon"},
 	{"exec", "Run a command in a runtime and print its output"},
+	{"push", "Copy a local file into a runtime"},
+	{"pull", "Copy a file from a runtime to this machine"},
 	{"shell", "Open an interactive shell, choosing a runtime if none is given"},
 	{"status", "Show the daemon version, capabilities, latency, and runtimes"},
 	{"doctor", "Check the connection step by step and suggest fixes"},
@@ -27,6 +29,8 @@ var commands = []commandInfo{
 var examples = []string{
 	"mexaroot runtimes",
 	"mexaroot exec ubuntu -- uname -a",
+	"mexaroot push ubuntu report.pdf /root/report.pdf",
+	"mexaroot pull ubuntu /root/report.pdf report.pdf",
 	"mexaroot shell",
 	"mexaroot status",
 	"mexaroot doctor",

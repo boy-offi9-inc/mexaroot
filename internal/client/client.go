@@ -26,6 +26,7 @@ type Client struct {
 
 	conn      *websocket.Conn
 	events    chan wire.Message
+	chunks    chan chunkFrame
 	done      chan struct{}
 	closed    chan struct{}
 	closeOnce sync.Once
@@ -45,6 +46,7 @@ func Connect(ctx context.Context, url, token, name string) (*Client, error) {
 	c := &Client{
 		conn:    conn,
 		events:  make(chan wire.Message, eventBuffer),
+		chunks:  make(chan chunkFrame, eventBuffer),
 		done:    make(chan struct{}),
 		closed:  make(chan struct{}),
 		pending: make(map[string]chan wire.Message),
@@ -148,11 +150,21 @@ func (c *Client) unregister(id string) {
 func (c *Client) readLoop() {
 	defer close(c.done)
 	defer close(c.events)
+	defer close(c.chunks)
 
 	for {
-		_, data, err := c.conn.Read(context.Background())
+		msgType, data, err := c.conn.Read(context.Background())
 		if err != nil {
 			return
+		}
+		if msgType == websocket.MessageBinary {
+			stream, chunk, cerr := wire.DecodeChunk(data)
+			select {
+			case c.chunks <- chunkFrame{stream: stream, data: chunk, err: cerr}:
+			case <-c.closed:
+				return
+			}
+			continue
 		}
 		msg, err := wire.Decode(data)
 		if err != nil {
