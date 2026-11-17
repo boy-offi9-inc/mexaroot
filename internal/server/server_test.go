@@ -219,7 +219,6 @@ func TestExecTimeout(t *testing.T) {
 func TestUnsupportedMessages(t *testing.T) {
 	ctx, conn := dial(t, newTestServer(t))
 	authenticate(ctx, t, conn)
-	expectError(t, call(ctx, t, conn, wire.TypeFilePush, nil), wire.CodeUnsupported)
 	expectError(t, call(ctx, t, conn, "bogus.type", nil), wire.CodeUnsupported)
 }
 

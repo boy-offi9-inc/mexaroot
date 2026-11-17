@@ -3,12 +3,16 @@ package native
 import (
 	"context"
 	"os"
+	"path/filepath"
 
 	"github.com/boy-offi9-inc/mexaroot/internal/runtimes"
 	"github.com/boy-offi9-inc/mexaroot/internal/runtimes/hostexec"
 )
 
-var _ runtimes.Interactive = (*Runtime)(nil)
+var (
+	_ runtimes.Interactive = (*Runtime)(nil)
+	_ runtimes.FileRoot    = (*Runtime)(nil)
+)
 
 type Runtime struct {
 	id   string
@@ -52,6 +56,11 @@ func (r *Runtime) StartSession(_ context.Context, req runtimes.SessionRequest) (
 		Dir:  req.Cwd,
 		Env:  hostexec.MergeEnv(req.Env),
 	}, req.Cols, req.Rows)
+}
+
+// Root reports the host file system, which is what commands run in.
+func (r *Runtime) Root() string {
+	return string(filepath.Separator)
 }
 
 func defaultShell() string {

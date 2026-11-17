@@ -26,7 +26,10 @@ var (
 	interactiveShell = []string{"/bin/sh", "-l"}
 )
 
-var _ runtimes.Interactive = (*Runtime)(nil)
+var (
+	_ runtimes.Interactive = (*Runtime)(nil)
+	_ runtimes.FileRoot    = (*Runtime)(nil)
+)
 
 type Config struct {
 	Binary     string
@@ -85,6 +88,13 @@ func Discover(cfg Config) ([]*Runtime, error) {
 		found = append(found, rt)
 	}
 	return found, nil
+}
+
+func (r *Runtime) Root() string {
+	if r.cfg.RootfsRoot == "" {
+		return ""
+	}
+	return filepath.Join(r.cfg.RootfsRoot, r.alias)
 }
 
 func (r *Runtime) Info() runtimes.Info {

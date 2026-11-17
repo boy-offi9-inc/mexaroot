@@ -26,7 +26,10 @@ const (
 
 var ErrNoRootfs = errors.New("rootfs directory is not configured")
 
-var _ runtimes.Interactive = (*Runtime)(nil)
+var (
+	_ runtimes.Interactive = (*Runtime)(nil)
+	_ runtimes.FileRoot    = (*Runtime)(nil)
+)
 
 var baselineEnv = map[string]string{
 	"HOME":   "/root",
@@ -75,6 +78,10 @@ func New(alias string, cfg Config) (*Runtime, error) {
 		rootfs: filepath.Join(cfg.RootfsRoot, alias),
 		binary: binaryOrDefault(cfg),
 	}, nil
+}
+
+func (r *Runtime) Root() string {
+	return r.rootfs
 }
 
 func (r *Runtime) Info() runtimes.Info {

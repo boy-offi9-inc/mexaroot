@@ -122,3 +122,10 @@ type Interactive interface {
 	Runtime
 	StartSession(ctx context.Context, req SessionRequest) (Session, error)
 }
+
+// FileRoot is implemented by runtimes that expose a file system for
+// file transfers. Paths in file messages are relative to Root().
+type FileRoot interface {
+	Runtime
+	Root() string
+}

@@ -60,6 +60,7 @@ func New(cfg Config) (*Server, error) {
 		capabilities: []string{
 			wire.CapabilityExec,
 			wire.CapabilitySession,
+			wire.CapabilityFile,
 			wire.CapabilityKeepalive,
 		},
 	}, nil
@@ -105,9 +106,10 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn.SetReadLimit(maxMessageSize)
 
 	c := &connection{
-		server:   s,
-		conn:     conn,
-		sessions: make(map[uint32]runtimes.Session),
+		server:    s,
+		conn:      conn,
+		sessions:  make(map[uint32]runtimes.Session),
+		transfers: make(map[uint32]*fileTransfer),
 	}
 	c.serve(r.Context())
 }
@@ -134,6 +136,7 @@ type connection struct {
 
 	mu         sync.Mutex
 	sessions   map[uint32]runtimes.Session
+	transfers  map[uint32]*fileTransfer
 	nextStream uint32
 }
 
@@ -142,6 +145,7 @@ func (c *connection) serve(ctx context.Context) {
 	defer func() {
 		cancel()
 		c.closeSessions()
+		c.closeTransfers()
 		c.wg.Wait()
 	}()
 
@@ -151,8 +155,21 @@ func (c *connection) serve(ctx context.Context) {
 
 	inflight := make(chan struct{}, maxInflight)
 	for {
-		msg, ok := c.readMessage(ctx)
-		if !ok {
+		msgType, data, err := c.conn.Read(ctx)
+		if err != nil {
+			return
+		}
+		if msgType == websocket.MessageBinary {
+			c.routeChunk(ctx, data)
+			continue
+		}
+		if msgType != websocket.MessageText {
+			c.conn.Close(websocket.StatusUnsupportedData, "binary frames are not supported")
+			return
+		}
+		msg, err := wire.Decode(data)
+		if err != nil {
+			c.conn.Close(websocket.StatusInvalidFramePayloadData, "malformed message")
 			return
 		}
 		if !runsConcurrently(msg.Type) {
@@ -169,30 +186,39 @@ func (c *connection) serve(ctx context.Context) {
 	}
 }
 
+func (c *connection) routeChunk(ctx context.Context, data []byte) {
+	stream, chunk, err := wire.DecodeChunk(data)
+	if err != nil {
+		return
+	}
+	c.mu.Lock()
+	tr, ok := c.transfers[stream]
+	c.mu.Unlock()
+	if !ok {
+		return
+	}
+	select {
+	case tr.chunks <- chunk:
+	case <-tr.done:
+	}
+}
+
 func runsConcurrently(msgType string) bool {
 	return msgType == wire.TypeExecRun
 }
 
-func (c *connection) readMessage(ctx context.Context) (wire.Message, bool) {
+func (c *connection) handshake(ctx context.Context) bool {
 	msgType, data, err := c.conn.Read(ctx)
 	if err != nil {
-		return wire.Message{}, false
+		return false
 	}
 	if msgType != websocket.MessageText {
 		c.conn.Close(websocket.StatusUnsupportedData, "binary frames are not supported")
-		return wire.Message{}, false
+		return false
 	}
 	msg, err := wire.Decode(data)
 	if err != nil {
 		c.conn.Close(websocket.StatusInvalidFramePayloadData, "malformed message")
-		return wire.Message{}, false
-	}
-	return msg, true
-}
-
-func (c *connection) handshake(ctx context.Context) bool {
-	msg, ok := c.readMessage(ctx)
-	if !ok {
 		return false
 	}
 	if msg.Type != wire.TypeHello {
@@ -272,6 +298,12 @@ func (c *connection) respond(ctx context.Context, msg wire.Message) {
 		resp, err = c.sessionResize(msg)
 	case wire.TypeSessionClose:
 		resp, err = c.sessionClose(msg)
+	case wire.TypeFilePush:
+		c.handleFilePush(ctx, msg)
+		return
+	case wire.TypeFilePull:
+		c.handleFilePull(ctx, msg)
+		return
 	default:
 		resp = wire.NewErrorResponse(msg, wire.CodeInvalidRequest, "unexpected message type: "+msg.Type)
 	}
