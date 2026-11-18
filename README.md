@@ -43,7 +43,55 @@ go build -o mexarootd ./cmd/mexarootd
 go build -o mexaroot ./cmd/mexaroot
 ```
 
-Copy `mexarootd` to your phone (Termux) and `mexaroot` wherever you'll drive it from — the PC, or the same device.
+Copy `mexarootd` wherever you want the daemon to run (phone or desktop) and `mexaroot` wherever you'll drive it from. Client builds are checked for `linux/amd64`, `darwin/arm64`, and `windows/amd64`:
+
+```sh
+GOOS=linux   GOARCH=amd64 go build -o mexaroot ./cmd/mexaroot
+GOOS=darwin  GOARCH=arm64 go build -o mexaroot ./cmd/mexaroot
+GOOS=windows GOARCH=amd64 go build -o mexaroot.exe ./cmd/mexaroot
+```
+
+## Desktop install
+
+The daemon is the same binary on every OS. It is long-lived, binds `127.0.0.1:8750` by default, and runs the native host runtime. Clients connect with `mexaroot -url ws://127.0.0.1:8750/ws` and a pairing token from `mexarootd -print-token` (or `MEXAROOT_TOKEN`).
+
+### Linux
+
+Build both binaries, install them under `/usr/local/bin`, then install the shipped systemd unit. For a system-wide service that survives reboots:
+
+```sh
+sudo install -m 0755 mexarootd mexaroot /usr/local/bin/
+sudo cp contrib/mexaroot.service /etc/systemd/system/mexaroot.service
+# edit User= to the account that should own the pairing token
+sudo systemctl daemon-reload
+sudo systemctl enable --now mexaroot
+```
+
+`contrib/mexaroot.service` sets `Restart=on-failure`, `NoNewPrivileges=yes`, and `ExecStart=/usr/local/bin/mexarootd -addr 127.0.0.1:8750`. Check logs with `journalctl -u mexaroot -f`. For a per-user service with no root, copy the same unit into `~/.config/systemd/user/mexaroot.service`, drop the `User=` line, then run `systemctl --user enable --now mexaroot` and `loginctl enable-linger "$USER"` so it starts at boot without a login session.
+
+### macOS
+
+Build for `darwin/arm64` and install to `/usr/local/bin`. There is no systemd unit for macOS; a launchd agent in `~/Library/LaunchAgents/` is the equivalent. Create `~/Library/LaunchAgents/dev.mexaroot.mexarootd.plist` with `ProgramArguments` pointing at `/usr/local/bin/mexarootd -addr 127.0.0.1:8750`, `RunAtLoad` true, and `KeepAlive` true, then load it:
+
+```sh
+launchctl load ~/Library/LaunchAgents/dev.mexaroot.mexarootd.plist
+```
+
+The agent starts on login and restarts on failure. Pair and connect exactly as on Linux; the loopback default and token file path are unchanged.
+
+### Windows
+
+Build `mexaroot.exe` and `mexarootd.exe` with `GOOS=windows GOARCH=amd64`, then register the daemon with Service Control Manager from an elevated prompt:
+
+```bat
+sc create mexarootd binPath= "C:\Program Files\mexaroot\mexarootd.exe -addr 127.0.0.1:8750" start= auto
+sc start mexarootd
+sc query mexarootd
+```
+
+`start= auto` survives reboot, and Windows restarts the service on failure through its default recovery policy (set explicitly with `sc failure mexarootd reset= 0 actions= restart/5000` if needed). Remove it with `sc stop mexarootd && sc delete mexarootd`. No `svc` wrapper ships; plain process supervision is enough (ADR 0013). Client commands are the same from PowerShell, e.g. `mexaroot.exe exec termux -- hostname`.
+
+On all three, a desktop daemon is reachable from another machine through the same SSH tunnel documented below; loopback binding is kept by default.
 
 ## Quick start
 
@@ -118,7 +166,8 @@ Also set Termux's battery usage to *Unrestricted* in system settings.
 | Doc | Covers |
 |---|---|
 | [Wire protocol](protocol/PROTOCOL.md) | Message shapes, handshake, capability negotiation, chunked file transfer |
-| [ADR index](docs/adr/README.md) | Twelve architecture decisions and why each was made |
+| [ADR index](docs/adr/README.md) | Thirteen architecture decisions and why each was made |
+| [Systemd unit](contrib/mexaroot.service) | Reboot-survivable desktop daemon install on Linux |
 | [Security policy](SECURITY.md) | How to report vulnerabilities |
 | [Contributing](CONTRIBUTING.md) | House style and workflow |
 
@@ -138,7 +187,7 @@ go build -ldflags "-X github.com/boy-offi9-inc/mexaroot/internal/version.Version
 
 ## Status
 
-Pre-release, actively developed. The architecture, wire protocol, and file transfer are implemented and tested (race-detector clean across 15 packages); desktop sessions are on the roadmap.
+Pre-release, actively developed. The architecture, wire protocol, file transfer, and desktop daemon installs (systemd unit, launchd agent, `sc.exe` recipe) are implemented and tested (race-detector clean across 15 packages); desktop sessions work against the loopback daemon today.
 
 ## License
 

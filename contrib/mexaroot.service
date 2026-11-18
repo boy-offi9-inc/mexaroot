@@ -1,0 +1,31 @@
+# System-level unit for the mexaroot daemon. Copy to
+# /etc/systemd/system/mexaroot.service, adjust User= to the account that
+# should own the pairing token (the daemon creates it owner-only on first
+# start under that user's home), then run
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now mexarootd
+#
+# For a per-user install without root, drop an equivalent unit into
+# ~/.config/systemd/user/mexarootd.service (remove the User= line) and
+# enable it with `systemctl --user enable --now mexarootd` plus
+# `loginctl enable-linger <user>` so it survives logout and reboot.
+#
+# The daemon binds 127.0.0.1:8750 by default; reach it from another
+# machine through an SSH tunnel (see README, Desktop install section).
+
+[Unit]
+Description=mexaroot daemon
+Documentation=https://github.com/boy-offi9-inc/mexaroot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mexaroot
+ExecStart=/usr/local/bin/mexarootd -addr 127.0.0.1:8750
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target
