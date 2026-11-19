@@ -1,0 +1,80 @@
+# Roadmap
+
+What exists today: one authenticated daemon, runtimes for native Termux,
+proot-distro and Proroot, exec, interactive shell, push and pull (256 MiB cap,
+SHA-256 verified), status, doctor, `-json`, shell completion, wake lock,
+termux-services install, desktop daemon recipes, 13 ADRs, CI, and a security
+policy. Not yet in place: published releases, automated pairing, port
+forwarding, session resume, an MCP server, a companion app. This page tracks
+what is open and the order to take it in.
+
+## Open
+
+### Correctness and documentation to verify first
+
+- [ ] Windows service install: the README registers `mexarootd.exe` with `sc create`, but a plain console program normally cannot run under the Windows service manager (fails to start with error 1053), and ADR 0013's claim that plain supervision is enough needs testing - fix by implementing the service protocol (`golang.org/x/sys/windows/svc`), or switch the docs to a wrapper such as NSSM or WinSW, or to Task Scheduler. Verify on Windows
+- [ ] Windows interactive sessions: pseudo-terminal support was Unix-only in the original code; the README says desktop sessions work - either ConPTY support exists, or the README states which platforms support shell. Verify on Windows
+- [ ] Runtime ID on desktops: the native runtime is called `termux` even on Linux, macOS and Windows (`exec termux -- hostname`) - the ID should be `host` outside Android, with `termux` kept on Android
+- [ ] Exec output limits: file transfer has a cap, but it is unclear whether exec buffers unbounded output in memory - output should be capped or streamed, with a documented limit and a test
+- [ ] Private vulnerability reporting: `SECURITY.md` tells reporters to use GitHub's private reporting option - enable it in the repository security settings
+
+### Releases and installation
+
+- [ ] Tag v0.1.0: today installing requires building from source with Go, and `-version` reports `dev` unless built with the ldflags
+- [ ] Publish prebuilt binaries for Linux (amd64, arm64), macOS (arm64) and Windows (amd64) with checksums, for example through GoReleaser on tag push
+- [ ] Add a CHANGELOG and a release checklist
+- [ ] Confirm `go install github.com/boy-offi9-inc/mexaroot/cmd/mexaroot@latest` works and document it
+- [ ] Termux package: a recipe for the Termux package repository, or a documented install script, so a phone does not need a Go toolchain
+- [ ] Test that a static Linux arm64 build runs correctly on Android (DNS and certificate paths), or build natively in Termux for releases
+
+### Security and pairing
+
+Today there is one shared token, a manual copy step and an SSH tunnel for
+remote use.
+
+- [ ] Pairing flow: `mexarootd -pair` shows a QR code or URI that encodes the address and a one-time secret, and the client saves a named host
+- [ ] Per-device tokens with listing, revocation and rotation
+- [ ] Built-in TLS with a pinned certificate fingerprint, as an alternative to the SSH tunnel
+- [ ] Rate limiting or backoff on failed handshakes
+- [ ] Remove the need for `-token` on the command line, since it is visible in the process list (environment variable and file already exist)
+- [ ] An audit log of connections and executed commands, off by default
+- [ ] Optional per-runtime or read-only permissions for a token
+
+### Features
+
+- [ ] Port forwarding, for example `mexaroot forward 8080 ubuntu:3000` - reach dev servers running inside a distro from the PC
+- [ ] Session resume and reattach - shells survive Wi-Fi drops (ADR 0009 documents that sessions currently end with the connection)
+- [ ] MCP server, `mexaroot mcp` - lets AI agents run commands in the phone's environments, with an allowlist and a read-only mode
+- [ ] Streaming exec with cancel - live output for long commands
+- [ ] Distro lifecycle and hot reload - newly installed distros appear without restarting the daemon, plus list, install and remove
+- [ ] Clipboard sync and notifications - small phone-side conveniences, for example a notification when a long command finishes
+- [ ] Android companion app (Kotlin) - boot start, foreground service, QR pairing and a status tile; replaces the reliance on Termux:Boot
+- [ ] Boot start without the app - Termux:Boot instructions, once the details are verified
+
+## Quality and project health
+
+- [ ] Add govulncheck and Dependabot, and pin GitHub Actions to commit SHAs
+- [ ] Run tests on macOS and Windows as well; the original workflow tested on Ubuntu only, with cross-builds for the other platforms (verify)
+- [ ] Fuzz the wire decoder and add protocol conformance tests
+- [ ] Add a CI integration test that starts the daemon and drives a real PTY session
+- [ ] Publish a compatibility matrix: Android versions, Termux builds, proot-distro and Proroot versions, with the checks done by `mexaroot doctor`
+- [ ] Issue and pull request templates, labelled starter issues, and a short architecture overview for contributors
+- [ ] Keep the README claims in step with the code
+
+## Suggested order
+
+1. Correctness fixes (Windows service, runtime ID, exec limits, vulnerability reporting)
+2. v0.1.0 release with binaries and checksums
+3. Pairing with TLS and per-device tokens
+4. Port forwarding
+5. Session resume
+6. MCP server
+7. Companion app
+8. Ongoing quality items
+
+## Device verification needed
+
+- The Windows service recipe and shell on Windows
+- A static Linux arm64 binary running in Termux
+- Proroot options and the guest environment baseline on real hardware
+- Behaviour of the wake lock and runit service across a reboot
