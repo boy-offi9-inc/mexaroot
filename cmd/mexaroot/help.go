@@ -59,7 +59,7 @@ func commandNames() []string {
 
 func printHelp(w io.Writer, s ui.Styler, fs *flag.FlagSet) {
 	fmt.Fprintln(w)
-	fmt.Fprint(w, s.Banner("mexaroot", version.Version, "Termux, proot and your PC, bridged"))
+	fmt.Fprint(w, s.Banner("mexaroot", version.VersionString(), "Termux, proot and your PC, bridged"))
 	fmt.Fprintln(w)
 
 	fmt.Fprintln(w, "  "+s.Section("Usage"))

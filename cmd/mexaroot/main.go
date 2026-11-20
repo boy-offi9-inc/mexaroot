@@ -60,7 +60,7 @@ func execute(args []string) int {
 	errOut := ui.New(os.Stderr, opts.noColor)
 
 	if opts.showVersion {
-		fmt.Println(version.Version)
+		fmt.Println(version.VersionString())
 		return 0
 	}
 
@@ -106,7 +106,7 @@ func run(opts options, fs *flag.FlagSet, args []string, out, errOut ui.Styler) (
 		return 1, err
 	}
 
-	c, err := client.Connect(ctx, opts.url, secret, "mexaroot/"+version.Version)
+	c, err := client.Connect(ctx, opts.url, secret, "mexaroot/"+version.VersionString())
 	if err != nil {
 		return 1, err
 	}
@@ -168,7 +168,7 @@ func mcpCommand(ctx context.Context, c *client.Client, args []string) (int, erro
 		}
 		return 2, err
 	}
-	mcp.SetVersion(version.Version)
+	mcp.SetVersion(version.VersionString())
 	server := mcp.NewServer(*readOnly)
 	if err := mcp.RegisterTools(server, c, mcp.ParseAllow(*allow)); err != nil {
 		return 1, err

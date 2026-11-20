@@ -92,7 +92,7 @@ func runChecks(ctx context.Context, opts options) []check {
 	checks = append(checks, check{Name: "Address", Status: checkOK, Detail: host + " is reachable"})
 
 	connectCtx, cancel := context.WithTimeout(ctx, connectTimeout)
-	c, err := client.Connect(connectCtx, opts.url, token, "mexaroot-doctor/"+version.Version)
+	c, err := client.Connect(connectCtx, opts.url, token, "mexaroot-doctor/"+version.VersionString())
 	cancel()
 	if err != nil {
 		return append(checks, check{

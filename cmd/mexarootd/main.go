@@ -49,7 +49,7 @@ func main() {
 	var err error
 	switch {
 	case *showVersion:
-		fmt.Println(version.Version)
+		fmt.Println(version.VersionString())
 	case *installService:
 		err = installServiceCommand(opts)
 	case *uninstallService:
@@ -147,7 +147,7 @@ func serve(opts options) error {
 	}
 
 	styler := ui.New(os.Stderr, opts.noColor)
-	fmt.Fprint(os.Stderr, "\n", styler.Banner("mexarootd", version.Version, "Bridging Termux, proot and your PC"))
+	fmt.Fprint(os.Stderr, "\n", styler.Banner("mexarootd", version.VersionString(), "Bridging Termux, proot and your PC"))
 	fmt.Fprintln(os.Stderr)
 
 	if opts.wakeLock {
@@ -163,7 +163,7 @@ func serve(opts options) error {
 	srv, err := server.New(server.Config{
 		Addr:             opts.addr,
 		Token:            token,
-		Version:          version.Version,
+		Version:          version.VersionString(),
 		Registry:         registry,
 		AllowNonLoopback: opts.allowRemote,
 		AuditPath:        opts.auditFile,
