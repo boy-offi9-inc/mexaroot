@@ -41,6 +41,7 @@ type Config struct {
 type Server struct {
 	cfg          Config
 	capabilities []string
+	limiter      *handshakeLimiter
 }
 
 func New(cfg Config) (*Server, error) {
@@ -98,6 +99,10 @@ func (s *Server) has(capability string) bool {
 }
 
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	if s.limiter.blocked(r.RemoteAddr) {
+		http.Error(w, "too many failed handshakes; try again later", http.StatusTooManyRequests)
+		return
+	}
 	conn, err := websocket.Accept(w, r, nil)
 	if err != nil {
 		return
@@ -107,6 +112,7 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	c := &connection{
 		server:    s,
+		remoteIP:  r.RemoteAddr,
 		conn:      conn,
 		sessions:  make(map[uint32]runtimes.Session),
 		transfers: make(map[uint32]*fileTransfer),
@@ -130,9 +136,10 @@ func requireLoopback(addr string) error {
 }
 
 type connection struct {
-	server *Server
-	conn   *websocket.Conn
-	wg     sync.WaitGroup
+	server   *Server
+	remoteIP string
+	conn     *websocket.Conn
+	wg       sync.WaitGroup
 
 	mu         sync.Mutex
 	sessions   map[uint32]runtimes.Session
@@ -213,26 +220,31 @@ func (c *connection) handshake(ctx context.Context) bool {
 		return false
 	}
 	if msgType != websocket.MessageText {
+		c.server.limiter.recordFailure(c.remoteIP)
 		c.conn.Close(websocket.StatusUnsupportedData, "binary frames are not supported")
 		return false
 	}
 	msg, err := wire.Decode(data)
 	if err != nil {
+		c.server.limiter.recordFailure(c.remoteIP)
 		c.conn.Close(websocket.StatusInvalidFramePayloadData, "malformed message")
 		return false
 	}
 	if msg.Type != wire.TypeHello {
+		c.server.limiter.recordFailure(c.remoteIP)
 		c.reject(ctx, msg, wire.CodeUnauthorized, "handshake required")
 		return false
 	}
 
 	var req wire.HelloRequest
 	if err := msg.DecodePayload(&req); err != nil {
+		c.server.limiter.recordFailure(c.remoteIP)
 		c.send(ctx, errorResponse(msg, err))
 		c.conn.Close(websocket.StatusPolicyViolation, "invalid handshake")
 		return false
 	}
 	if !auth.Equal(req.Token, c.server.cfg.Token) {
+		c.server.limiter.recordFailure(c.remoteIP)
 		c.reject(ctx, msg, wire.CodeUnauthorized, "invalid token")
 		return false
 	}
@@ -252,6 +264,7 @@ func (c *connection) handshake(ctx context.Context) bool {
 		c.conn.Close(websocket.StatusInternalError, "internal error")
 		return false
 	}
+	c.server.limiter.success(c.remoteIP)
 	c.send(ctx, resp)
 	return true
 }

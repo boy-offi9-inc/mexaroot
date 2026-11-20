@@ -14,10 +14,14 @@ tracks what is open and the order to take it in.
 
 - [ ] Windows service install: the README registers `mexarootd.exe` with `sc create`, but a plain console program normally cannot run under the Windows service manager (fails to start with error 1053), and ADR 0013's claim that plain supervision is enough needs testing - fix by implementing the service protocol (`golang.org/x/sys/windows/svc`), or switch the docs to a wrapper such as NSSM or WinSW, or to Task Scheduler. Verify on Windows
 - [ ] Windows interactive sessions: pseudo-terminal support was Unix-only in the original code; the README says desktop sessions work - either ConPTY support exists, or the README states which platforms support shell. Verify on Windows
-- [ ] Exec output limits: file transfer has a cap, but it is unclear whether exec buffers unbounded output in memory - output should be capped or streamed, with a documented limit and a test
 - [ ] Private vulnerability reporting: `SECURITY.md` tells reporters to use GitHub's private reporting option - enable it in the repository security settings
 
 ## Done
+- [x] Rate limiting on failed handshakes: five failed handshakes (bad token, malformed
+  message, wrong type, undecodable payload) from one IP inside a rolling minute puts the
+  host on a 30-second cooldown, during which new WebSocket connections get HTTP 429
+  before any frame is read. A successful handshake clears the host's record, and loopback
+  addresses are never limited. See `internal/server/handshake_limiter.go`
 
 - [x] Exec output limits: `exec` used to buffer unbounded output in memory. It now keeps at most 8 MiB per stream (`hostexec.MaxExecOutput`); anything past the cap is discarded while the command runs to completion, `ExecResult.Truncated` is carried through the wire protocol as `truncated` on `exec.run` responses, and the client notes the cut on stderr. Tests cover the cap, the exact-fit boundary and a 20 MiB run. See `internal/runtimes/hostexec/capped.go`
 - [x] Runtime ID on desktops: the native runtime reported `termux` on Linux, macOS and Windows. It now reports `host` (Kind `host`) outside Android - detection is `runtime.GOOS == "android"` or `TERMUX_VERSION` set - and keeps `termux` inside Termux. See `internal/runtimes/native/`
@@ -39,7 +43,6 @@ remote use.
 - [ ] Pairing flow: `mexarootd -pair` shows a QR code or URI that encodes the address and a one-time secret, and the client saves a named host
 - [ ] Per-device tokens with listing, revocation and rotation
 - [ ] Built-in TLS with a pinned certificate fingerprint, as an alternative to the SSH tunnel
-- [ ] Rate limiting or backoff on failed handshakes
 - [ ] Remove the need for `-token` on the command line, since it is visible in the process list (environment variable and file already exist)
 - [ ] An audit log of connections and executed commands, off by default
 - [ ] Optional per-runtime or read-only permissions for a token
