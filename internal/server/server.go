@@ -61,8 +61,14 @@ func New(cfg Config) (*Server, error) {
 			return nil, err
 		}
 	}
+	audit, err := newAuditLog(cfg.AuditPath)
+	if err != nil {
+		return nil, err
+	}
 	return &Server{
-		cfg: cfg,
+		cfg:     cfg,
+		limiter: newHandshakeLimiter(),
+		audit:   audit,
 		capabilities: []string{
 			wire.CapabilityExec,
 			wire.CapabilitySession,

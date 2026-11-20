@@ -4,8 +4,8 @@ What exists today: one authenticated daemon, runtimes for native Termux and
 the host, proot-distro and Proroot, exec, interactive shell, push and pull
 (256 MiB cap, SHA-256 verified), status, doctor, `-json`, shell completion,
 wake lock, termux-services install, desktop daemon recipes, 13 ADRs, CI, and
-a security policy. Not yet in place: published releases, automated pairing,
-port forwarding, session resume, an MCP server, a companion app. This page
+a security policy. Not yet in place: automated pairing,
+port forwarding, session resume, a companion app. This page
 tracks what is open and the order to take it in.
 
 ## Open
@@ -17,6 +17,14 @@ tracks what is open and the order to take it in.
 - [ ] Private vulnerability reporting: `SECURITY.md` tells reporters to use GitHub's private reporting option - enable it in the repository security settings
 
 ## Done
+- [x] MCP server (`mexaroot mcp`): a Model Context Protocol server on stdio so AI agents
+  (Claude Desktop, Claude Code, any MCP client) can list runtimes, run commands, push
+  and pull files, and read status - through the same daemon and token as the CLI, so
+  it adds no new privileges. `-read-only` registers only the read-only tools
+  (list_runtimes, pull, status); `-allow` restricts the tool list further. Unknown or
+  refused tools come back as tool-level errors, never a crash. Verified end-to-end:
+  daemon + `mexaroot mcp` + JSON-RPC over stdio, exec round-trip and audit entries
+  recorded. See `internal/mcp/` and `docs/MCP.md`
 - [x] Release tooling: `.goreleaser.yaml` (both binaries, linux/amd64, linux/arm64,
   darwin/arm64, windows/amd64; tar.gz + zip for Windows; checksums; version injected
   into `internal/version.Version` via ldflags), `.github/workflows/release.yml`
@@ -60,7 +68,6 @@ remote use.
 
 - [ ] Port forwarding, for example `mexaroot forward 8080 ubuntu:3000` - reach dev servers running inside a distro from the PC
 - [ ] Session resume and reattach - shells survive Wi-Fi drops (ADR 0009 documents that sessions currently end with the connection)
-- [ ] MCP server, `mexaroot mcp` - lets AI agents run commands in the phone's environments, with an allowlist and a read-only mode
 - [ ] Streaming exec with cancel - live output for long commands
 - [ ] Distro lifecycle and hot reload - newly installed distros appear without restarting the daemon, plus list, install and remove
 - [ ] Clipboard sync and notifications - small phone-side conveniences, for example a notification when a long command finishes

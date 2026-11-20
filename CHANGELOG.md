@@ -37,5 +37,7 @@ distros and a PC, with a matching client.
   `-wake-lock`, termux-services install/uninstall.
 - Handshake-failure rate limiting: 5 failed handshakes from one IP in a
   rolling minute puts the host on a 30-second cooldown (loopback exempt).
+- MCP server (`mexaroot mcp`): expose the runtimes to AI agents over
+  stdio, with `-read-only` and an `-allow` allowlist (`docs/MCP.md`).
 - Security policy (`SECURITY.md`), 13 ADRs, CI (gofmt, vet, race-tested
   tests, cross-build matrix).

@@ -11,6 +11,7 @@ import (
 
 	"github.com/boy-offi9-inc/mexaroot/internal/auth"
 	"github.com/boy-offi9-inc/mexaroot/internal/client"
+	"github.com/boy-offi9-inc/mexaroot/internal/mcp"
 	"github.com/boy-offi9-inc/mexaroot/internal/ui"
 	"github.com/boy-offi9-inc/mexaroot/internal/version"
 	"github.com/boy-offi9-inc/mexaroot/internal/wire"
@@ -112,6 +113,8 @@ func run(opts options, fs *flag.FlagSet, args []string, out, errOut ui.Styler) (
 	defer c.Close()
 
 	switch name {
+	case "mcp":
+		return mcpCommand(ctx, c, args[1:])
 	case "runtimes":
 		return listRuntimes(ctx, c, opts, out)
 	case "exec":
@@ -153,6 +156,27 @@ func tokenSource(token, tokenFile string) (string, string, error) {
 func resolveToken(token, tokenFile string) (string, error) {
 	secret, _, err := tokenSource(token, tokenFile)
 	return secret, err
+}
+
+func mcpCommand(ctx context.Context, c *client.Client, args []string) (int, error) {
+	fs := flag.NewFlagSet("mcp", flag.ContinueOnError)
+	readOnly, allow := mcp.BindFlags(fs)
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			fmt.Print(mcp.Usage())
+			return 0, nil
+		}
+		return 2, err
+	}
+	mcp.SetVersion(version.Version)
+	server := mcp.NewServer(*readOnly)
+	if err := mcp.RegisterTools(server, c, mcp.ParseAllow(*allow)); err != nil {
+		return 1, err
+	}
+	if err := server.Serve(ctx, os.Stdin, os.Stdout); err != nil && !errors.Is(err, context.Canceled) {
+		return 1, err
+	}
+	return 0, nil
 }
 
 func listRuntimes(ctx context.Context, c *client.Client, opts options, s ui.Styler) (int, error) {

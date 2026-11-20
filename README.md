@@ -181,6 +181,7 @@ Also set Termux's battery usage to *Unrestricted* in system settings.
 
 | Doc | Covers |
 |---|---|
+| [MCP server](docs/MCP.md) | `mexaroot mcp`: expose the phone's runtimes to AI agents, with read-only mode and an allowlist |
 | [Wire protocol](protocol/PROTOCOL.md) | Message shapes, handshake, capability negotiation, chunked file transfer |
 | [ADR index](docs/adr/README.md) | Thirteen architecture decisions and why each was made |
 | [Systemd unit](contrib/mexaroot.service) | Reboot-survivable desktop daemon install on Linux |
