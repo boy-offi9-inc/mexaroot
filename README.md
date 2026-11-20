@@ -35,7 +35,18 @@ PC ──SSH tunnel──▶ mexarootd (Termux)
 
 ## Install
 
-Build from source (Go 1.22+):
+Download a prebuilt release from the
+[Releases page](https://github.com/boy-offi9-inc/mexaroot/releases) — archives for
+linux/amd64, linux/arm64, darwin/arm64 and windows/amd64, each containing both
+`mexaroot` (client) and `mexarootd` (daemon), plus a `checksums.txt` to verify
+against. Or install with Go:
+
+```sh
+go install github.com/boy-offi9-inc/mexaroot/cmd/mexaroot@latest
+go install github.com/boy-offi9-inc/mexaroot/cmd/mexarootd@latest
+```
+
+Or build from source (Go 1.22+):
 
 ```sh
 git clone https://github.com/boy-offi9-inc/mexaroot.git

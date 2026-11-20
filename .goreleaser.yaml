@@ -1,0 +1,85 @@
+# GoReleaser configuration for mexaroot. Release flow:
+#   1. Update CHANGELOG.md (move Unreleased entries under the new version)
+#   2. Commit and tag: git tag -a v0.1.0 -m "v0.1.0" && git push origin v0.1.0
+#   3. The release workflow (.github/workflows/release.yml) runs goreleaser,
+#      which builds the binaries, publishes the GitHub Release with the
+#      CHANGELOG body, and uploads checksums.
+# Verify a tag locally first: goreleaser release --snapshot --clean
+version: 2
+
+project_name: mexaroot
+
+builds:
+  - id: mexaroot
+    main: ./cmd/mexaroot
+    binary: mexaroot
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      # The daemon and client both report this via `-version`.
+      - -s -w -X github.com/boy-offi9-inc/mexaroot/internal/version.Version={{.Version}}
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    goarm: ["7"]
+    ignore:
+      # Keep the matrix to what CI cross-builds and what the roadmap promises:
+      # Linux (amd64, arm64), macOS (arm64), Windows (amd64).
+      - goos: windows
+        goarch: arm64
+      - goos: darwin
+        goarch: amd64
+  - id: mexarootd
+    main: ./cmd/mexarootd
+    binary: mexarootd
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w -X github.com/boy-offi9-inc/mexaroot/internal/version.Version={{.Version}}
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ignore:
+      - goos: windows
+        goarch: arm64
+      - goos: darwin
+        goarch: amd64
+
+archives:
+  - id: default
+    format: tar.gz
+    # Windows gets a zip; the rest a tar.gz named mexaroot_<version>_<os>_<arch>.
+    format_overrides:
+      - goos: windows
+        format: zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-dev"
+
+changelog:
+  # CHANGELOG.md is the human-readable record; the release body gets the
+  # header/footer below instead of a generated commit list.
+  disable: true
+
+release:
+  draft: false
+  # goreleaser fills the body from CHANGELOG.md's section for this version
+  # when `use: github` changelog mode is off; instead we let it generate from
+  # commits and keep CHANGELOG.md as the human-readable record.
+  header: |
+    ## Install
+
+    Download the archive for your platform, unpack it, and put `mexaroot`
+    (client) and `mexarootd` (daemon) on your PATH. Verify with
+    `mexaroot -version` - it prints this release's version, not `dev`.
+    SHA-256 sums are in `checksums.txt`.
+
+    The daemon is intended for Termux/Android and Linux hosts; macOS and
+    Windows daemon builds are provided for development but the interactive
+    session and service-install features are verified on Linux/Termux only
+    (see docs/ROADMAP.md's Device verification section).
+  footer: |
+    **Full changelog**: see CHANGELOG.md in this repository.

@@ -17,6 +17,14 @@ tracks what is open and the order to take it in.
 - [ ] Private vulnerability reporting: `SECURITY.md` tells reporters to use GitHub's private reporting option - enable it in the repository security settings
 
 ## Done
+- [x] Release tooling: `.goreleaser.yaml` (both binaries, linux/amd64, linux/arm64,
+  darwin/arm64, windows/amd64; tar.gz + zip for Windows; checksums; version injected
+  into `internal/version.Version` via ldflags), `.github/workflows/release.yml`
+  (publishes on `v*` tag push), `CHANGELOG.md` (Keep a Changelog), and
+  `docs/RELEASING.md` (the per-release checklist). Dry-run verified:
+  `goreleaser release --snapshot --clean` builds all 8 binaries and 4 archives, and
+  the built client's `-version` prints the injected version instead of `dev`. The
+  tag itself (v0.1.0) is the user's call - pushing it publishes the release.
 - [x] Audit log of connections and executed commands (`mexarootd -audit-log FILE`): an
   append-only JSON Lines file (mode 0600) recording `connect`, `auth_failed`, `exec`
   (runtime + argv), `session_start` (runtime) and failures. Off by default; a write
@@ -33,9 +41,6 @@ tracks what is open and the order to take it in.
 
 ### Releases and installation
 
-- [ ] Tag v0.1.0: today installing requires building from source with Go, and `-version` reports `dev` unless built with the ldflags
-- [ ] Publish prebuilt binaries for Linux (amd64, arm64), macOS (arm64) and Windows (amd64) with checksums, for example through GoReleaser on tag push
-- [ ] Add a CHANGELOG and a release checklist
 - [ ] Confirm `go install github.com/boy-offi9-inc/mexaroot/cmd/mexaroot@latest` works and document it
 - [ ] Termux package: a recipe for the Termux package repository, or a documented install script, so a phone does not need a Go toolchain
 - [ ] Test that a static Linux arm64 build runs correctly on Android (DNS and certificate paths), or build natively in Termux for releases
