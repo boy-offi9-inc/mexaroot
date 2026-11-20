@@ -1,7 +1,6 @@
 package hostexec
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -38,12 +37,16 @@ func Run(ctx context.Context, c Command) (runtimes.ExecResult, error) {
 	cmd.Env = c.Env
 	cmd.WaitDelay = waitDelay
 
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+	var stdout = newCappedBuffer(MaxExecOutput)
+	var stderr = newCappedBuffer(MaxExecOutput)
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
 
 	err := cmd.Run()
-	result := runtimes.ExecResult{Stdout: stdout.Bytes(), Stderr: stderr.Bytes()}
+	result := runtimes.ExecResult{Stdout: stdout.buf.Bytes(), Stderr: stderr.buf.Bytes()}
+	if stdout.truncated() || stderr.truncated() {
+		result.Truncated = true
+	}
 
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		return result, runtimes.ErrTimeout

@@ -357,9 +357,10 @@ func (c *connection) execRun(ctx context.Context, req wire.Message) (wire.Messag
 	}
 
 	return wire.NewResponse(req, wire.ExecResponse{
-		ExitCode: result.ExitCode,
-		Stdout:   string(result.Stdout),
-		Stderr:   string(result.Stderr),
+		ExitCode:  result.ExitCode,
+		Stdout:    string(result.Stdout),
+		Stderr:    string(result.Stderr),
+		Truncated: result.Truncated,
 	})
 }
 

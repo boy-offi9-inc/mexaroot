@@ -19,6 +19,7 @@ tracks what is open and the order to take it in.
 
 ## Done
 
+- [x] Exec output limits: `exec` used to buffer unbounded output in memory. It now keeps at most 8 MiB per stream (`hostexec.MaxExecOutput`); anything past the cap is discarded while the command runs to completion, `ExecResult.Truncated` is carried through the wire protocol as `truncated` on `exec.run` responses, and the client notes the cut on stderr. Tests cover the cap, the exact-fit boundary and a 20 MiB run. See `internal/runtimes/hostexec/capped.go`
 - [x] Runtime ID on desktops: the native runtime reported `termux` on Linux, macOS and Windows. It now reports `host` (Kind `host`) outside Android - detection is `runtime.GOOS == "android"` or `TERMUX_VERSION` set - and keeps `termux` inside Termux. See `internal/runtimes/native/`
 
 ### Releases and installation

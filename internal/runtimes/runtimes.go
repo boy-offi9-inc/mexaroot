@@ -43,6 +43,9 @@ type ExecResult struct {
 	ExitCode int
 	Stdout   []byte
 	Stderr   []byte
+	// Truncated is true when stdout or stderr hit MaxExecOutput; whatever
+	// came after the cap was discarded, not buffered.
+	Truncated bool
 }
 
 var (

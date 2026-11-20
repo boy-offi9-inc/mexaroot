@@ -35,6 +35,9 @@ type ExecResponse struct {
 	ExitCode int    `json:"exit_code"`
 	Stdout   string `json:"stdout"`
 	Stderr   string `json:"stderr"`
+	// Truncated is true when output hit the daemon's exec cap (8 MiB per
+	// stream); everything past the cap was discarded, not buffered.
+	Truncated bool `json:"truncated,omitempty"`
 }
 
 type SessionStartRequest struct {

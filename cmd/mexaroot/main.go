@@ -219,5 +219,8 @@ func execCommand(ctx context.Context, c *client.Client, opts options, args []str
 	}
 	fmt.Fprint(os.Stdout, resp.Stdout)
 	fmt.Fprint(os.Stderr, resp.Stderr)
+	if resp.Truncated {
+		fmt.Fprintln(os.Stderr, "mexaroot: output exceeded the 8 MiB exec cap and was cut off")
+	}
 	return resp.ExitCode, nil
 }

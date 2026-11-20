@@ -132,6 +132,8 @@ Shell with no runtime argument opens a numbered menu. `-json` works on `runtimes
 
 Installed proot-distro distros register automatically by alias (`mexaroot exec ubuntu -- cat /etc/os-release`); with a Proroot launcher on the path, each also registers as `<alias>-proroot`.
 
+**Exec output limit:** `exec` keeps at most 8 MiB of stdout and 8 MiB of stderr in memory; anything past that is discarded while the command still runs to completion (exit codes and timeouts unaffected). When output was cut, the response carries `truncated: true` (visible in `-json`) and the client prints a note on stderr — a runaway `yes` can't grow the daemon's heap.
+
 ## Keeping the daemon alive
 
 The daemon holds a Termux wake lock while it runs (`-wake-lock=false` to disable). For automatic restart after a crash, run it under termux-services:
