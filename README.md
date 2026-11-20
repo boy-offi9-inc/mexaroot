@@ -56,6 +56,8 @@ GOOS=windows GOARCH=amd64 go build -o mexaroot.exe ./cmd/mexaroot
 
 The daemon is the same binary on every OS. It is long-lived, binds `127.0.0.1:8750` by default, and runs the native host runtime. Clients connect with `mexaroot -url ws://127.0.0.1:8750/ws` and a pairing token from `mexarootd -print-token` (or `MEXAROOT_TOKEN`).
 
+Pass `-audit-log FILE` to have the daemon append a JSON Lines audit log (created with mode `0600`) of connections, failed handshakes, executed commands (runtime and argv) and interactive-session starts. It is off by default, and a failed write never breaks the request it was recording.
+
 ### Linux
 
 Build both binaries, install them under `/usr/local/bin`, then install the shipped systemd unit. For a system-wide service that survives reboots:

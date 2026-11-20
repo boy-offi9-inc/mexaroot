@@ -17,6 +17,11 @@ tracks what is open and the order to take it in.
 - [ ] Private vulnerability reporting: `SECURITY.md` tells reporters to use GitHub's private reporting option - enable it in the repository security settings
 
 ## Done
+- [x] Audit log of connections and executed commands (`mexarootd -audit-log FILE`): an
+  append-only JSON Lines file (mode 0600) recording `connect`, `auth_failed`, `exec`
+  (runtime + argv), `session_start` (runtime) and failures. Off by default; a write
+  error is counted and surfaced by the status check rather than breaking the request.
+  See `internal/server/audit.go`
 - [x] Rate limiting on failed handshakes: five failed handshakes (bad token, malformed
   message, wrong type, undecodable payload) from one IP inside a rolling minute puts the
   host on a 30-second cooldown, during which new WebSocket connections get HTTP 429
@@ -44,7 +49,6 @@ remote use.
 - [ ] Per-device tokens with listing, revocation and rotation
 - [ ] Built-in TLS with a pinned certificate fingerprint, as an alternative to the SSH tunnel
 - [ ] Remove the need for `-token` on the command line, since it is visible in the process list (environment variable and file already exist)
-- [ ] An audit log of connections and executed commands, off by default
 - [ ] Optional per-runtime or read-only permissions for a token
 
 ### Features

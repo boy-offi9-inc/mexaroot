@@ -36,12 +36,17 @@ type Config struct {
 	Version          string
 	Registry         *runtimes.Registry
 	AllowNonLoopback bool
+	// AuditPath enables the audit log (JSON Lines, mode 0600) when non-empty.
+	// Off by default. Records connections, auth failures, exec commands and
+	// session starts; see audit.go.
+	AuditPath string
 }
 
 type Server struct {
 	cfg          Config
 	capabilities []string
 	limiter      *handshakeLimiter
+	audit        *auditLog
 }
 
 func New(cfg Config) (*Server, error) {
@@ -102,6 +107,9 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	if s.limiter.blocked(r.RemoteAddr) {
 		http.Error(w, "too many failed handshakes; try again later", http.StatusTooManyRequests)
 		return
+	}
+	if s.audit != nil && s.audit.f != nil {
+		s.audit.write(AuditEntry{Event: "connect", RemoteIP: hostOf(r.RemoteAddr)})
 	}
 	conn, err := websocket.Accept(w, r, nil)
 	if err != nil {
@@ -221,17 +229,20 @@ func (c *connection) handshake(ctx context.Context) bool {
 	}
 	if msgType != websocket.MessageText {
 		c.server.limiter.recordFailure(c.remoteIP)
+		c.server.audit.write(AuditEntry{Event: "auth_failed", RemoteIP: hostOf(c.remoteIP)})
 		c.conn.Close(websocket.StatusUnsupportedData, "binary frames are not supported")
 		return false
 	}
 	msg, err := wire.Decode(data)
 	if err != nil {
 		c.server.limiter.recordFailure(c.remoteIP)
+		c.server.audit.write(AuditEntry{Event: "auth_failed", RemoteIP: hostOf(c.remoteIP)})
 		c.conn.Close(websocket.StatusInvalidFramePayloadData, "malformed message")
 		return false
 	}
 	if msg.Type != wire.TypeHello {
 		c.server.limiter.recordFailure(c.remoteIP)
+		c.server.audit.write(AuditEntry{Event: "auth_failed", RemoteIP: hostOf(c.remoteIP)})
 		c.reject(ctx, msg, wire.CodeUnauthorized, "handshake required")
 		return false
 	}
@@ -239,12 +250,14 @@ func (c *connection) handshake(ctx context.Context) bool {
 	var req wire.HelloRequest
 	if err := msg.DecodePayload(&req); err != nil {
 		c.server.limiter.recordFailure(c.remoteIP)
+		c.server.audit.write(AuditEntry{Event: "auth_failed", RemoteIP: hostOf(c.remoteIP)})
 		c.send(ctx, errorResponse(msg, err))
 		c.conn.Close(websocket.StatusPolicyViolation, "invalid handshake")
 		return false
 	}
 	if !auth.Equal(req.Token, c.server.cfg.Token) {
 		c.server.limiter.recordFailure(c.remoteIP)
+		c.server.audit.write(AuditEntry{Event: "auth_failed", RemoteIP: hostOf(c.remoteIP)})
 		c.reject(ctx, msg, wire.CodeUnauthorized, "invalid token")
 		return false
 	}
@@ -353,6 +366,13 @@ func (c *connection) execRun(ctx context.Context, req wire.Message) (wire.Messag
 	if err != nil {
 		return wire.Message{}, &wire.Error{Code: wire.CodeNotFound, Message: err.Error()}
 	}
+
+	c.server.audit.write(AuditEntry{
+		Event:    "exec",
+		RemoteIP: hostOf(c.remoteIP),
+		Runtime:  params.Runtime,
+		Argv:     params.Argv,
+	})
 
 	result, err := rt.Exec(ctx, runtimes.ExecRequest{
 		Argv:    params.Argv,

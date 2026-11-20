@@ -29,6 +29,7 @@ type options struct {
 	allowRemote bool
 	noColor     bool
 	wakeLock    bool
+	auditFile   string
 }
 
 func main() {
@@ -38,6 +39,7 @@ func main() {
 	flag.BoolVar(&opts.allowRemote, "allow-non-loopback", false, "permit listening on non-loopback addresses")
 	flag.BoolVar(&opts.noColor, "no-color", false, "disable colored output")
 	flag.BoolVar(&opts.wakeLock, "wake-lock", true, "hold a Termux wake lock while running")
+	flag.StringVar(&opts.auditFile, "audit-log", "", "append a JSON Lines audit log of connections and executed commands to this file (off by default)")
 	printToken := flag.Bool("print-token", false, "print the pairing token and exit")
 	installService := flag.Bool("install-service", false, "install a termux-services service and exit")
 	uninstallService := flag.Bool("uninstall-service", false, "remove the termux-services service and exit")
@@ -164,6 +166,7 @@ func serve(opts options) error {
 		Version:          version.Version,
 		Registry:         registry,
 		AllowNonLoopback: opts.allowRemote,
+		AuditPath:        opts.auditFile,
 	})
 	if err != nil {
 		return err
@@ -173,5 +176,8 @@ func serve(opts options) error {
 	defer stop()
 
 	fmt.Fprintf(os.Stderr, "\n  %s listening on %s\n\n", styler.Paint(ui.Green, "●"), styler.Bold(opts.addr))
+	if opts.auditFile != "" {
+		fmt.Fprintf(os.Stderr, "  %s audit log at %s\n", styler.Paint(ui.Green, "●"), opts.auditFile)
+	}
 	return srv.ListenAndServe(ctx)
 }

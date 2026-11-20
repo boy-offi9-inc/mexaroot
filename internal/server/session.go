@@ -16,11 +16,24 @@ const (
 )
 
 func (c *connection) handleSessionStart(ctx context.Context, req wire.Message) {
+	var params wire.SessionStartRequest
+	_ = req.DecodePayload(&params) // startSession re-decodes and validates
 	session, stream, err := c.startSession(ctx, req)
 	if err != nil {
+		c.server.audit.write(AuditEntry{
+			Event:    "session_start",
+			RemoteIP: hostOf(c.remoteIP),
+			Runtime:  params.Runtime,
+			Error:    err.Error(),
+		})
 		c.send(ctx, errorResponse(req, err))
 		return
 	}
+	c.server.audit.write(AuditEntry{
+		Event:    "session_start",
+		RemoteIP: hostOf(c.remoteIP),
+		Runtime:  params.Runtime,
+	})
 
 	resp, err := wire.NewResponse(req, wire.StreamResponse{Stream: stream})
 	if err != nil {
