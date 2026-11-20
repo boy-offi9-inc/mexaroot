@@ -71,7 +71,7 @@ func TestClientSession(t *testing.T) {
 
 	var started wire.StreamResponse
 	err = c.Call(ctx, wire.TypeSessionStart, wire.SessionStartRequest{
-		Runtime: "termux",
+		Runtime: nativeRuntimeID,
 		Shell:   "cat",
 		Cols:    80,
 		Rows:    24,

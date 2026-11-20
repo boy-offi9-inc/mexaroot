@@ -19,7 +19,8 @@ Running a command inside a proot distro from your PC, moving files between devic
 
 ```
 PC ──SSH tunnel──▶ mexarootd (Termux)
-                     ├─ termux (native)
+                     ├─ termux (native, Android)
+                     ├─ host (native, desktop)
                      ├─ ubuntu (proot-distro)
                      ├─ ubuntu-proroot (Proroot)
                      └─ …any runtime that registers
@@ -89,7 +90,7 @@ sc start mexarootd
 sc query mexarootd
 ```
 
-`start= auto` survives reboot, and Windows restarts the service on failure through its default recovery policy (set explicitly with `sc failure mexarootd reset= 0 actions= restart/5000` if needed). Remove it with `sc stop mexarootd && sc delete mexarootd`. No `svc` wrapper ships; plain process supervision is enough (ADR 0013). Client commands are the same from PowerShell, e.g. `mexaroot.exe exec termux -- hostname`.
+`start= auto` survives reboot, and Windows restarts the service on failure through its default recovery policy (set explicitly with `sc failure mexarootd reset= 0 actions= restart/5000` if needed). Remove it with `sc stop mexarootd && sc delete mexarootd`. No `svc` wrapper ships; plain process supervision is enough (ADR 0013). Client commands are the same from PowerShell, e.g. `mexaroot.exe exec host -- hostname` (the native runtime is `host` outside Android, `termux` inside Termux).
 
 On all three, a desktop daemon is reachable from another machine through the same SSH tunnel documented below; loopback binding is kept by default.
 
@@ -117,7 +118,7 @@ ssh -p 8022 -L 8750:127.0.0.1:8750 <phone>
 export MEXAROOT_TOKEN=<token>
 
 mexaroot runtimes                              # what's registered
-mexaroot exec termux -- uname -a               # run a command
+mexaroot exec host -- uname -a                # run a command (termux inside Termux on Android)
 mexaroot shell ubuntu                          # interactive shell (PTY, resize, TERM forwarded)
 mexaroot push ubuntu report.pdf /root/         # file in
 mexaroot pull ubuntu /root/out.log out.log     # file out

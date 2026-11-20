@@ -12,6 +12,7 @@ import (
 type Kind string
 
 const (
+	KindHost        Kind = "host"
 	KindTermux      Kind = "termux"
 	KindProotDistro Kind = "proot-distro"
 	KindProroot     Kind = "proroot"

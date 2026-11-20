@@ -17,6 +17,10 @@ import (
 
 const testToken = "test-token"
 
+// nativeRuntimeID is the ID the native runtime reports on this platform:
+// "termux" inside Termux on Android, "host" everywhere else.
+var nativeRuntimeID = native.New().Info().ID
+
 func newTestRegistry(t *testing.T) *runtimes.Registry {
 	t.Helper()
 	registry := runtimes.NewRegistry()
@@ -167,7 +171,7 @@ func TestRuntimeList(t *testing.T) {
 	if err := resp.DecodePayload(&payload); err != nil {
 		t.Fatalf("DecodePayload: %v", err)
 	}
-	if len(payload.Runtimes) != 1 || payload.Runtimes[0].ID != "termux" {
+	if len(payload.Runtimes) != 1 || payload.Runtimes[0].ID != nativeRuntimeID {
 		t.Fatalf("unexpected runtimes: %+v", payload.Runtimes)
 	}
 }
@@ -176,7 +180,7 @@ func TestExecRun(t *testing.T) {
 	ctx, conn := dial(t, newTestServer(t))
 	authenticate(ctx, t, conn)
 	resp := call(ctx, t, conn, wire.TypeExecRun, wire.ExecRequest{
-		Runtime: "termux",
+		Runtime: nativeRuntimeID,
 		Argv:    []string{"sh", "-c", "printf hi; exit 2"},
 	})
 	var payload wire.ExecResponse
@@ -201,7 +205,7 @@ func TestExecUnknownRuntime(t *testing.T) {
 func TestExecInvalidRequest(t *testing.T) {
 	ctx, conn := dial(t, newTestServer(t))
 	authenticate(ctx, t, conn)
-	resp := call(ctx, t, conn, wire.TypeExecRun, wire.ExecRequest{Runtime: "termux"})
+	resp := call(ctx, t, conn, wire.TypeExecRun, wire.ExecRequest{Runtime: nativeRuntimeID})
 	expectError(t, resp, wire.CodeInvalidRequest)
 }
 
@@ -209,7 +213,7 @@ func TestExecTimeout(t *testing.T) {
 	ctx, conn := dial(t, newTestServer(t))
 	authenticate(ctx, t, conn)
 	resp := call(ctx, t, conn, wire.TypeExecRun, wire.ExecRequest{
-		Runtime:   "termux",
+		Runtime:   nativeRuntimeID,
 		Argv:      []string{"sh", "-c", "exec sleep 5"},
 		TimeoutMS: 100,
 	})

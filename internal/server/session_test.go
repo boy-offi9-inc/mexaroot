@@ -93,7 +93,7 @@ func awaitOutput(ctx context.Context, t *testing.T, conn *websocket.Conn, want s
 func startShell(ctx context.Context, t *testing.T, conn *websocket.Conn, shell string) uint32 {
 	t.Helper()
 	request(ctx, t, conn, "start", wire.TypeSessionStart, wire.SessionStartRequest{
-		Runtime: "termux",
+		Runtime: nativeRuntimeID,
 		Shell:   shell,
 		Cols:    80,
 		Rows:    24,

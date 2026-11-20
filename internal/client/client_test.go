@@ -15,6 +15,8 @@ import (
 	"github.com/boy-offi9-inc/mexaroot/internal/wire"
 )
 
+var nativeRuntimeID = native.New().Info().ID
+
 func startServer(t *testing.T, token string) string {
 	t.Helper()
 	registry := runtimes.NewRegistry()
@@ -54,13 +56,13 @@ func TestClientEndToEnd(t *testing.T) {
 	if err := c.Call(ctx, wire.TypeRuntimeList, nil, &list); err != nil {
 		t.Fatalf("runtime.list: %v", err)
 	}
-	if len(list.Runtimes) != 1 || list.Runtimes[0].ID != "termux" {
+	if len(list.Runtimes) != 1 || list.Runtimes[0].ID != nativeRuntimeID {
 		t.Fatalf("unexpected runtimes: %+v", list.Runtimes)
 	}
 
 	var result wire.ExecResponse
 	err = c.Call(ctx, wire.TypeExecRun, wire.ExecRequest{
-		Runtime: "termux",
+		Runtime: nativeRuntimeID,
 		Argv:    []string{"sh", "-c", "printf ok"},
 	}, &result)
 	if err != nil {

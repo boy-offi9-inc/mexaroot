@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/boy-offi9-inc/mexaroot/internal/runtimes"
 	"github.com/boy-offi9-inc/mexaroot/internal/runtimes/hostexec"
@@ -16,17 +17,32 @@ var (
 
 type Runtime struct {
 	id   string
+	kind runtimes.Kind
 	name string
 }
 
+// isTermux reports whether the daemon runs inside Termux on Android: either
+// the Go toolchain targeted android, or Termux's own environment marker is
+// present. Everywhere else the native runtime is the plain host.
+func isTermux() bool {
+	if runtime.GOOS == "android" {
+		return true
+	}
+	_, ok := os.LookupEnv("TERMUX_VERSION")
+	return ok
+}
+
 func New() *Runtime {
-	return &Runtime{id: "termux", name: "Termux"}
+	if isTermux() {
+		return &Runtime{id: "termux", kind: runtimes.KindTermux, name: "Termux"}
+	}
+	return &Runtime{id: "host", kind: runtimes.KindHost, name: "Host"}
 }
 
 func (r *Runtime) Info() runtimes.Info {
 	return runtimes.Info{
 		ID:    r.id,
-		Kind:  runtimes.KindTermux,
+		Kind:  r.kind,
 		Name:  r.name,
 		State: runtimes.StateAvailable,
 	}

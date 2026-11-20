@@ -209,7 +209,7 @@ func TestFilePushRejectsOversize(t *testing.T) {
 	ctx, conn := dial(t, newTestServer(t))
 	authenticate(ctx, t, conn)
 	resp := call(ctx, t, conn, wire.TypeFilePush, wire.FilePushRequest{
-		Runtime: "termux",
+		Runtime: nativeRuntimeID,
 		Path:    "ok.txt",
 		Size:    1 << 40,
 		SHA256:  digest(nil),
@@ -220,7 +220,7 @@ func TestFilePushRejectsOversize(t *testing.T) {
 func TestFilePushMissingPath(t *testing.T) {
 	ctx, conn := dial(t, newTestServer(t))
 	authenticate(ctx, t, conn)
-	resp := call(ctx, t, conn, wire.TypeFilePush, wire.FilePushRequest{Runtime: "termux"})
+	resp := call(ctx, t, conn, wire.TypeFilePush, wire.FilePushRequest{Runtime: nativeRuntimeID})
 	expectError(t, resp, wire.CodeInvalidRequest)
 }
 

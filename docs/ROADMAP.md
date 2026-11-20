@@ -1,12 +1,12 @@
 # Roadmap
 
-What exists today: one authenticated daemon, runtimes for native Termux,
-proot-distro and Proroot, exec, interactive shell, push and pull (256 MiB cap,
-SHA-256 verified), status, doctor, `-json`, shell completion, wake lock,
-termux-services install, desktop daemon recipes, 13 ADRs, CI, and a security
-policy. Not yet in place: published releases, automated pairing, port
-forwarding, session resume, an MCP server, a companion app. This page tracks
-what is open and the order to take it in.
+What exists today: one authenticated daemon, runtimes for native Termux and
+the host, proot-distro and Proroot, exec, interactive shell, push and pull
+(256 MiB cap, SHA-256 verified), status, doctor, `-json`, shell completion,
+wake lock, termux-services install, desktop daemon recipes, 13 ADRs, CI, and
+a security policy. Not yet in place: published releases, automated pairing,
+port forwarding, session resume, an MCP server, a companion app. This page
+tracks what is open and the order to take it in.
 
 ## Open
 
@@ -14,9 +14,12 @@ what is open and the order to take it in.
 
 - [ ] Windows service install: the README registers `mexarootd.exe` with `sc create`, but a plain console program normally cannot run under the Windows service manager (fails to start with error 1053), and ADR 0013's claim that plain supervision is enough needs testing - fix by implementing the service protocol (`golang.org/x/sys/windows/svc`), or switch the docs to a wrapper such as NSSM or WinSW, or to Task Scheduler. Verify on Windows
 - [ ] Windows interactive sessions: pseudo-terminal support was Unix-only in the original code; the README says desktop sessions work - either ConPTY support exists, or the README states which platforms support shell. Verify on Windows
-- [ ] Runtime ID on desktops: the native runtime is called `termux` even on Linux, macOS and Windows (`exec termux -- hostname`) - the ID should be `host` outside Android, with `termux` kept on Android
 - [ ] Exec output limits: file transfer has a cap, but it is unclear whether exec buffers unbounded output in memory - output should be capped or streamed, with a documented limit and a test
 - [ ] Private vulnerability reporting: `SECURITY.md` tells reporters to use GitHub's private reporting option - enable it in the repository security settings
+
+## Done
+
+- [x] Runtime ID on desktops: the native runtime reported `termux` on Linux, macOS and Windows. It now reports `host` (Kind `host`) outside Android - detection is `runtime.GOOS == "android"` or `TERMUX_VERSION` set - and keeps `termux` inside Termux. See `internal/runtimes/native/`
 
 ### Releases and installation
 

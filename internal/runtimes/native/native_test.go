@@ -3,7 +3,9 @@ package native
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -12,8 +14,30 @@ import (
 
 func TestInfo(t *testing.T) {
 	info := New().Info()
-	if info.ID != "termux" || info.Kind != runtimes.KindTermux || info.State != runtimes.StateAvailable {
+	// On Android/Termux the native runtime is termux; everywhere else it is
+	// the plain host runtime.
+	if runtime.GOOS == "android" || os.Getenv("TERMUX_VERSION") != "" {
+		if info.ID != "termux" || info.Kind != runtimes.KindTermux {
+			t.Fatalf("expected termux runtime, got: %+v", info)
+		}
+		return
+	}
+	if info.ID != "host" || info.Kind != runtimes.KindHost || info.State != runtimes.StateAvailable {
 		t.Fatalf("unexpected info: %+v", info)
+	}
+}
+
+func TestIsTermux(t *testing.T) {
+	if runtime.GOOS == "android" {
+		t.Skip("android build always reports termux")
+	}
+	os.Unsetenv("TERMUX_VERSION")
+	if isTermux() {
+		t.Fatal("expected isTermux=false without TERMUX_VERSION")
+	}
+	t.Setenv("TERMUX_VERSION", "0.118.0")
+	if !isTermux() {
+		t.Fatal("expected isTermux=true with TERMUX_VERSION set")
 	}
 }
 
