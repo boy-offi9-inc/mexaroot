@@ -5,10 +5,9 @@ and is injected at build time; a plain `go build` still reports `dev`.
 
 ## One-time setup
 
-- [ ] Install goreleaser (or let CI do the work - you only need it for
-      dry-runs): `go install github.com/goreleaser/goreleaser/v2@latest`
-- [ ] Confirm `GITHUB_TOKEN` is available when running goreleaser locally
-      (CI provides its own).
+- [ ] Install goreleaser locally only if dry-runs are wanted; CI installs
+      its own when publishing: `go install github.com/goreleaser/goreleaser/v2@latest`
+- [ ] `GITHUB_TOKEN` is only needed for local (non-CI) publishes; CI provides its own.
 
 ## Every release
 

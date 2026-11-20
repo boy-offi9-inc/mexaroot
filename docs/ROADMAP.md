@@ -23,8 +23,8 @@ tracks what is open and the order to take it in.
   (publishes on `v*` tag push), `CHANGELOG.md` (Keep a Changelog), and
   `docs/RELEASING.md` (the per-release checklist). Dry-run verified:
   `goreleaser release --snapshot --clean` builds all 8 binaries and 4 archives, and
-  the built client's `-version` prints the injected version instead of `dev`. The
-  tag itself (v0.1.0) is the user's call - pushing it publishes the release.
+  the built client's `-version` prints the injected version instead of `dev`. Cutting
+  the actual v0.1.0 tag is the last step - see `docs/RELEASING.md`.
 - [x] Audit log of connections and executed commands (`mexarootd -audit-log FILE`): an
   append-only JSON Lines file (mode 0600) recording `connect`, `auth_failed`, `exec`
   (runtime + argv), `session_start` (runtime) and failures. Off by default; a write
