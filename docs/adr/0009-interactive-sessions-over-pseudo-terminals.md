@@ -13,6 +13,6 @@ Each session runs one process attached to a pseudo-terminal, started through the
 ## Consequences
 
 - Terminal behavior matches a local terminal, including programs that require a controlling terminal.
-- Sessions do not outlive their connection, so detaching and reattaching is not provided.
+- Sessions do not outlive their connection by default; the session resume layer (`sessions_resume.go`, `session.list`/`session.attach`) keeps them alive for a detach grace window instead.
 - Input order is guaranteed per connection, and a stalled session can delay other requests on the same connection.
 - Pseudo-terminal support depends on the host platform, so Windows hosts cannot run sessions.

@@ -43,6 +43,9 @@ type Config struct {
 	// ForwardAllow lists hostnames or IPs the forward capability may dial.
 	// "*" permits any target. Empty restricts forwarding to loopback.
 	ForwardAllow []string
+	// DetachGrace is how long a session survives without a connection
+	// after its owner disconnects. Zero uses DefaultDetachGrace.
+	DetachGrace time.Duration
 }
 
 type Server struct {
@@ -50,6 +53,7 @@ type Server struct {
 	capabilities []string
 	limiter      *handshakeLimiter
 	audit        *auditLog
+	resume       *sessionRegistry
 }
 
 func New(cfg Config) (*Server, error) {
@@ -68,10 +72,13 @@ func New(cfg Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	registry := newSessionRegistry(cfg.DetachGrace)
+	registry.start()
 	return &Server{
 		cfg:     cfg,
 		limiter: newHandshakeLimiter(),
 		audit:   audit,
+		resume:  registry,
 		capabilities: []string{
 			wire.CapabilityExec,
 			wire.CapabilitySession,
@@ -171,9 +178,9 @@ func (c *connection) serve(ctx context.Context) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
 		cancel()
-		c.closeSessions()
 		c.closeTransfers()
 		c.closeForwards()
+		c.server.resume.detach(c)
 		c.wg.Wait()
 	}()
 
@@ -330,6 +337,11 @@ func (c *connection) respond(ctx context.Context, msg wire.Message) {
 		resp, err = wire.NewResponse(msg, nil)
 	case wire.TypeSessionStart:
 		c.handleSessionStart(ctx, msg)
+		return
+	case wire.TypeSessionList:
+		resp, err = c.sessionList(msg)
+	case wire.TypeSessionAttach:
+		c.handleSessionAttach(ctx, msg)
 		return
 	case wire.TypeSessionInput:
 		resp, err = c.sessionInput(msg)

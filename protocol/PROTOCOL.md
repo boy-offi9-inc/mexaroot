@@ -65,7 +65,7 @@ A capability is a string naming an optional feature. The daemon lists the capabi
 | Capability | Messages |
 | --- | --- |
 | `exec` | `exec.run` |
-| `session` | `session.start`, `session.input`, `session.resize`, `session.close` |
+| `session` | `session.start`, `session.list`, `session.attach`, `session.input`, `session.resize`, `session.close` |
 | `file` | `file.push`, `file.pull` |
 | `forward` | `forward.open`, `forward.data`, `forward.close` |
 | `keepalive` | `ping` |
@@ -149,6 +149,22 @@ Request payload:
 | `session.close` | `stream` |
 
 The daemon emits `session.output` events with `data` (base64) and a `session.exit` event with `exit_code` when the session ends.
+
+### Session resume
+
+Sessions survive the connection that started them: when a connection ends, its sessions keep running on the daemon for a grace period (five minutes by default) with their output buffered. `session.list` shows them:
+
+```json
+{ "sessions": [ { "stream": 3, "runtime": "ubuntu", "shell": "/bin/bash", "owned": false, "detached": true, "buffered": 1024 } ] }
+```
+
+`owned` is true when the asking connection currently owns the session and `detached` is true when no connection does; `buffered` counts the bytes replayed on attach. `session.attach` re-attaches:
+
+```json
+{ "stream": 3, "cols": 120, "rows": 40 }
+```
+
+`cols` and `rows` are optional. The response payload carries the same `stream` number. On attach the daemon first replays the buffered output as ordinary `session.output` events, then streams live output. Attaching to a session another connection owns returns `invalid_request`; attaching to an unknown or expired session returns `not_found`. A session that stays detached past the grace period is closed. `session.close` on a detached stream also ends it.
 
 ## File transfer
 

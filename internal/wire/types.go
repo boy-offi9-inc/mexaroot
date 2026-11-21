@@ -5,6 +5,8 @@ const (
 	TypeRuntimeList    = "runtime.list"
 	TypeExecRun        = "exec.run"
 	TypeSessionStart   = "session.start"
+	TypeSessionList    = "session.list"
+	TypeSessionAttach  = "session.attach"
 	TypeSessionInput   = "session.input"
 	TypeSessionResize  = "session.resize"
 	TypeSessionClose   = "session.close"
@@ -35,7 +37,7 @@ func RequiredCapability(msgType string) (string, bool) {
 		return "", true
 	case TypeExecRun:
 		return CapabilityExec, true
-	case TypeSessionStart, TypeSessionInput, TypeSessionResize, TypeSessionClose:
+	case TypeSessionStart, TypeSessionList, TypeSessionAttach, TypeSessionInput, TypeSessionResize, TypeSessionClose:
 		return CapabilitySession, true
 	case TypeFilePush, TypeFilePull:
 		return CapabilityFile, true

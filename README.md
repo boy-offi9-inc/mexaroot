@@ -32,6 +32,7 @@ PC ──SSH tunnel──▶ mexarootd (Termux)
 - **A versioned wire protocol** with capability negotiation — older and newer peers interoperate.
 - **Secure by default** — loopback binding, pairing tokens with constant-time comparison and owner-only file permissions, tunneled remote access. No shell interpolation anywhere.
 - **Swappable runtimes** behind stable interfaces — native Termux, proot-distro, and Proroot today; more tomorrow.
+- **Sessions that survive a dropped connection** — shells keep running across Wi-Fi drops for a grace window; `mexaroot attach` replays the buffered output and carries on.
 
 ## Install
 
@@ -133,6 +134,8 @@ export MEXAROOT_TOKEN=<token>
 mexaroot runtimes                              # what's registered
 mexaroot exec host -- uname -a                # run a command (termux inside Termux on Android)
 mexaroot shell ubuntu                          # interactive shell (PTY, resize, TERM forwarded)
+mexaroot sessions                              # resumable sessions that survived a disconnect
+mexaroot attach 3                              # re-attach to session 3; buffered output is replayed
 mexaroot forward 8080 127.0.0.1 3000           # reach a dev server on the daemon device from the PC
 mexaroot push ubuntu report.pdf /root/         # file in
 mexaroot pull ubuntu /root/out.log out.log     # file out
@@ -183,7 +186,7 @@ Also set Termux's battery usage to *Unrestricted* in system settings.
 | Doc | Covers |
 |---|---|
 | [MCP server](docs/MCP.md) | `mexaroot mcp`: expose the phone's runtimes to AI agents, with read-only mode and an allowlist |
-| [Wire protocol](protocol/PROTOCOL.md) | Message shapes, handshake, capability negotiation, chunked file transfer |
+| [Wire protocol](protocol/PROTOCOL.md) | Message shapes, handshake, capability negotiation, chunked file transfer, session resume |
 | [ADR index](docs/adr/README.md) | Thirteen architecture decisions and why each was made |
 | [Systemd unit](contrib/mexaroot.service) | Reboot-survivable desktop daemon install on Linux |
 | [Security policy](SECURITY.md) | How to report vulnerabilities |

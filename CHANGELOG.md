@@ -14,6 +14,12 @@ version bumps.
   WebSocket connection. Loopback targets by default; `-forward-allow` on the
   daemon permits other hosts. New `forward` capability and `forward.*` messages
   (documented in `protocol/PROTOCOL.md`).
+- Session resume and reattach: sessions survive the connection that started
+  them for a grace window (five minutes by default) with output buffered while
+  detached. `mexaroot sessions` lists them and `mexaroot attach STREAM`
+  replays the buffer and continues the session — shells survive Wi-Fi drops.
+  New `session.list` and `session.attach` messages (documented in
+  `protocol/PROTOCOL.md`).
 
 ## 0.1.0 - unreleased
 

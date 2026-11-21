@@ -5,9 +5,8 @@ the host, proot-distro and Proroot, exec, interactive shell, push and pull
 (256 MiB cap, SHA-256 verified), status, doctor, `-json`, shell completion,
 wake lock, termux-services install, desktop daemon recipes, an MCP server,
 13 ADRs, CI, a security policy, and tagged releases with binaries for four
-platforms. Not yet in place: automated pairing, port forwarding, session
-resume, a companion app. This page tracks what is open and the order to
-take it in.
+platforms. Not yet in place: automated pairing, a companion app. This page
+tracks what is open and the order to take it in.
 
 ## Open
 
@@ -36,7 +35,7 @@ remote use.
 ### Features
 
 - [ ] Port forwarding into a runtime (forward to hosts reachable from the daemon device shipped in v0.2.0; forwarding to services inside a distro still needs runtime-level routing)
-- [ ] Session resume and reattach - shells survive Wi-Fi drops (ADR 0009 documents that sessions currently end with the connection)
+- [x] Session resume and reattach - shipped: sessions survive their connection for a detach grace window with output buffered while detached, `mexaroot sessions` lists them and `mexaroot attach STREAM` replays the buffer and continues (`session.list` / `session.attach`, `internal/server/sessions_resume.go`, verified E2E with the real daemon)
 - [ ] Streaming exec with cancel - live output for long commands
 - [ ] Distro lifecycle and hot reload - newly installed distros appear without restarting the daemon, plus list, install and remove
 - [ ] Clipboard sync and notifications - small phone-side conveniences, for example a notification when a long command finishes
@@ -57,10 +56,9 @@ remote use.
 
 1. Correctness fixes (Windows service, vulnerability reporting)
 2. Pairing with TLS and per-device tokens
-3. Port forwarding
-4. Session resume
-5. Companion app
-6. Ongoing quality items
+3. Port forwarding into runtimes
+4. Companion app
+5. Ongoing quality items
 
 ## Device verification needed
 

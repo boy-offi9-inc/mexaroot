@@ -48,6 +48,29 @@ type SessionStartRequest struct {
 	Env     map[string]string `json:"env,omitempty"`
 }
 
+// SessionListResponse lists the daemon's resumable sessions.
+type SessionListResponse struct {
+	Sessions []SessionInfo `json:"sessions"`
+}
+
+// SessionInfo describes one resumable session.
+type SessionInfo struct {
+	Stream   uint32 `json:"stream"`
+	Runtime  string `json:"runtime"`
+	Shell    string `json:"shell,omitempty"`
+	Owned    bool   `json:"owned"`    // owned by the asking connection
+	Detached bool   `json:"detached"` // no connection owns it right now
+	Buffered int    `json:"buffered"` // replay bytes waiting
+}
+
+// SessionAttachRequest re-attaches to a session that survived a
+// disconnect. Output produced while detached is replayed first.
+type SessionAttachRequest struct {
+	Stream uint32 `json:"stream"`
+	Cols   int    `json:"cols,omitempty"`
+	Rows   int    `json:"rows,omitempty"`
+}
+
 type StreamResponse struct {
 	Stream uint32 `json:"stream"`
 }

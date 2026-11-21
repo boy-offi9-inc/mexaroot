@@ -125,6 +125,10 @@ func run(opts options, fs *flag.FlagSet, args []string, out, errOut ui.Styler) (
 		return pullCommand(ctx, c, args[1:])
 	case "shell":
 		return shellCommand(ctx, c, args[1:], errOut)
+	case "attach":
+		return attachCommand(ctx, c, args[1:], errOut)
+	case "sessions":
+		return sessionsCommand(ctx, c, args[1:])
 	case "forward":
 		return forwardCommand(ctx, c, args[1:])
 	case "status":
