@@ -125,6 +125,8 @@ func run(opts options, fs *flag.FlagSet, args []string, out, errOut ui.Styler) (
 		return pullCommand(ctx, c, args[1:])
 	case "shell":
 		return shellCommand(ctx, c, args[1:], errOut)
+	case "forward":
+		return forwardCommand(ctx, c, args[1:])
 	case "status":
 		return statusCommand(ctx, c, opts, out)
 	default:

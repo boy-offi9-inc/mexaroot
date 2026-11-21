@@ -133,6 +133,7 @@ export MEXAROOT_TOKEN=<token>
 mexaroot runtimes                              # what's registered
 mexaroot exec host -- uname -a                # run a command (termux inside Termux on Android)
 mexaroot shell ubuntu                          # interactive shell (PTY, resize, TERM forwarded)
+mexaroot forward 8080 127.0.0.1 3000           # reach a dev server on the daemon device from the PC
 mexaroot push ubuntu report.pdf /root/         # file in
 mexaroot pull ubuntu /root/out.log out.log     # file out
 mexaroot status                                # version, protocol, capabilities, latency

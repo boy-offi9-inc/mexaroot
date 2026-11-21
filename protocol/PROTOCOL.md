@@ -52,7 +52,7 @@ Response payload:
 {
   "daemon": "1.0.0",
   "protocol": 1,
-  "capabilities": ["exec", "session", "file", "keepalive"]
+  "capabilities": ["exec", "session", "file", "forward", "keepalive"]
 }
 ```
 
@@ -67,6 +67,7 @@ A capability is a string naming an optional feature. The daemon lists the capabi
 | `exec` | `exec.run` |
 | `session` | `session.start`, `session.input`, `session.resize`, `session.close` |
 | `file` | `file.push`, `file.pull` |
+| `forward` | `forward.open`, `forward.data`, `forward.close` |
 | `keepalive` | `ping` |
 
 `runtime.list` is always available.
@@ -103,6 +104,25 @@ Request payload:
 ```
 
 `cwd`, `env`, and `timeout_ms` are optional. The response payload contains `exit_code`, `stdout`, and `stderr`.
+
+## Port forwarding
+
+`forward.open` asks the daemon to dial a TCP host reachable from the daemon device. By default only loopback targets are allowed; daemons started with a forward allowlist (`-forward-allow`, or `ForwardAllow` in the config) may dial other hosts.
+
+Request payload:
+
+```json
+{ "host": "127.0.0.1", "port": 3000 }
+```
+
+The response payload contains the `stream` number of the channel.
+
+| Message | Payload |
+| --- | --- |
+| `forward.data` | `stream`, `data` (base64) — sent by either side; binary chunks on the same stream id are not used |
+| `forward.close` | `stream`, optional `error` — sent by either side to hang up |
+
+When the daemon-side connection ends (remote close or dial/read error), the daemon pushes a `forward.closed` event on the stream. A rejected `forward.open` is answered with `unsupported` (target not allowed) or `not_found` (target unreachable).
 
 ## Interactive sessions
 

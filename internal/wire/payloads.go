@@ -99,3 +99,26 @@ type FileDone struct {
 	OK    bool   `json:"ok"`
 	Error *Error `json:"error,omitempty"`
 }
+
+type ForwardOpenRequest struct {
+	// Host is the destination the daemon dials. Must be loopback unless the
+	// daemon was started with an allowlist of permitted hosts.
+	Host string `json:"host"`
+	Port int    `json:"port"`
+}
+
+type ForwardOpenResponse struct {
+	Stream uint32 `json:"stream"`
+}
+
+// ForwardClose is sent by either side to half-close/hang up a channel.
+type ForwardClose struct {
+	Stream uint32 `json:"stream"`
+	// Error describes why the channel ended, when it did not close cleanly.
+	Error string `json:"error,omitempty"`
+}
+
+// ForwardFailure is the open rejection event pushed back to the client.
+type ForwardFailure struct {
+	Error string `json:"error"`
+}

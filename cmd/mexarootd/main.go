@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/boy-offi9-inc/mexaroot/internal/auth"
@@ -24,12 +25,13 @@ import (
 const defaultAddr = "127.0.0.1:8750"
 
 type options struct {
-	addr        string
-	tokenFile   string
-	allowRemote bool
-	noColor     bool
-	wakeLock    bool
-	auditFile   string
+	addr         string
+	tokenFile    string
+	allowRemote  bool
+	forwardAllow string
+	noColor      bool
+	wakeLock     bool
+	auditFile    string
 }
 
 func main() {
@@ -37,6 +39,7 @@ func main() {
 	flag.StringVar(&opts.addr, "addr", defaultAddr, "address to listen on")
 	flag.StringVar(&opts.tokenFile, "token-file", "", "path to the pairing token file")
 	flag.BoolVar(&opts.allowRemote, "allow-non-loopback", false, "permit listening on non-loopback addresses")
+	flag.StringVar(&opts.forwardAllow, "forward-allow", "", "comma-separated hosts port forwarding may dial, or * for any (default: loopback only)")
 	flag.BoolVar(&opts.noColor, "no-color", false, "disable colored output")
 	flag.BoolVar(&opts.wakeLock, "wake-lock", true, "hold a Termux wake lock while running")
 	flag.StringVar(&opts.auditFile, "audit-log", "", "append a JSON Lines audit log of connections and executed commands to this file (off by default)")
@@ -62,6 +65,17 @@ func main() {
 	if err != nil {
 		log.Fatalf("mexarootd: %v", err)
 	}
+}
+
+func splitAllow(s string) []string {
+	if s == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	for i := range parts {
+		parts[i] = strings.TrimSpace(parts[i])
+	}
+	return parts
 }
 
 func loadToken(path string) (string, error) {
@@ -167,6 +181,7 @@ func serve(opts options) error {
 		Registry:         registry,
 		AllowNonLoopback: opts.allowRemote,
 		AuditPath:        opts.auditFile,
+		ForwardAllow:     splitAllow(opts.forwardAllow),
 	})
 	if err != nil {
 		return err

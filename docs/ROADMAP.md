@@ -35,7 +35,7 @@ remote use.
 
 ### Features
 
-- [ ] Port forwarding, for example `mexaroot forward 8080 ubuntu:3000` - reach dev servers running inside a distro from the PC
+- [ ] Port forwarding into a runtime (forward to hosts reachable from the daemon device shipped in v0.2.0; forwarding to services inside a distro still needs runtime-level routing)
 - [ ] Session resume and reattach - shells survive Wi-Fi drops (ADR 0009 documents that sessions currently end with the connection)
 - [ ] Streaming exec with cancel - live output for long commands
 - [ ] Distro lifecycle and hot reload - newly installed distros appear without restarting the daemon, plus list, install and remove

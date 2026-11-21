@@ -118,6 +118,13 @@ func (c *Client) Send(ctx context.Context, msgType string, payload any) error {
 	return nil
 }
 
+// WriteMessage writes an already-built message without a pending-call id.
+// Used for stream-scoped requests (forward.data, forward.close) whose replies
+// are handled through events or are ignored.
+func (c *Client) WriteMessage(ctx context.Context, msg wire.Message) error {
+	return c.write(ctx, msg)
+}
+
 func (c *Client) Close() error {
 	c.closeOnce.Do(func() { close(c.closed) })
 	return c.conn.Close(websocket.StatusNormalClosure, "")

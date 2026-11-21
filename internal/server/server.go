@@ -40,6 +40,9 @@ type Config struct {
 	// Off by default. Records connections, auth failures, exec commands and
 	// session starts; see audit.go.
 	AuditPath string
+	// ForwardAllow lists hostnames or IPs the forward capability may dial.
+	// "*" permits any target. Empty restricts forwarding to loopback.
+	ForwardAllow []string
 }
 
 type Server struct {
@@ -73,6 +76,7 @@ func New(cfg Config) (*Server, error) {
 			wire.CapabilityExec,
 			wire.CapabilitySession,
 			wire.CapabilityFile,
+			wire.CapabilityForward,
 			wire.CapabilityKeepalive,
 		},
 	}, nil
@@ -130,6 +134,7 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		conn:      conn,
 		sessions:  make(map[uint32]runtimes.Session),
 		transfers: make(map[uint32]*fileTransfer),
+		forwards:  make(map[uint32]*forwardChannel),
 	}
 	c.serve(r.Context())
 }
@@ -158,6 +163,7 @@ type connection struct {
 	mu         sync.Mutex
 	sessions   map[uint32]runtimes.Session
 	transfers  map[uint32]*fileTransfer
+	forwards   map[uint32]*forwardChannel
 	nextStream uint32
 }
 
@@ -167,6 +173,7 @@ func (c *connection) serve(ctx context.Context) {
 		cancel()
 		c.closeSessions()
 		c.closeTransfers()
+		c.closeForwards()
 		c.wg.Wait()
 	}()
 
@@ -336,6 +343,13 @@ func (c *connection) respond(ctx context.Context, msg wire.Message) {
 	case wire.TypeFilePull:
 		c.handleFilePull(ctx, msg)
 		return
+	case wire.TypeForwardOpen:
+		c.handleForwardOpen(ctx, msg)
+		return
+	case wire.TypeForwardData:
+		resp, err = c.forwardData(ctx, msg)
+	case wire.TypeForwardClose:
+		resp, err = c.forwardClose(msg)
 	default:
 		resp = wire.NewErrorResponse(msg, wire.CodeInvalidRequest, "unexpected message type: "+msg.Type)
 	}

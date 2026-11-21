@@ -7,7 +7,13 @@ version bumps.
 
 ## Unreleased
 
-Nothing yet.
+### Added
+
+- Port forwarding: `mexaroot forward LOCAL_PORT HOST PORT` relays local TCP
+  connections to a host reachable from the daemon device, over the same
+  WebSocket connection. Loopback targets by default; `-forward-allow` on the
+  daemon permits other hosts. New `forward` capability and `forward.*` messages
+  (documented in `protocol/PROTOCOL.md`).
 
 ## 0.1.0 - unreleased
 

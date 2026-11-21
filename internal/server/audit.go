@@ -22,6 +22,7 @@ type AuditEntry struct {
 	Event    string   `json:"event"` // "connect" | "auth_failed" | "exec" | "session_start" | "disconnect"
 	RemoteIP string   `json:"remote_ip,omitempty"`
 	Runtime  string   `json:"runtime,omitempty"`
+	Detail   string   `json:"detail,omitempty"`
 	Argv     []string `json:"argv,omitempty"`
 	ExitCode *int     `json:"exit_code,omitempty"`
 	Error    string   `json:"error,omitempty"`
