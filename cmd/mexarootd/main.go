@@ -168,11 +168,6 @@ func acquireWakeLock(styler ui.Styler) func() {
 }
 
 func serveContext(opts options, ctx context.Context) error {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	cancelMu.Lock()
-	serveCancel = cancel
-	cancelMu.Unlock()
 	token, err := loadToken(opts.tokenFile)
 	if err != nil {
 		return err
@@ -215,24 +210,28 @@ func serveContext(opts options, ctx context.Context) error {
 func serve(opts options) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	registerStop(stop)
 	return serveContext(opts, ctx)
 }
 
-// stopServe cancels the daemon's context; the Windows service handler calls
-// it from Execute when the service control manager requests Stop, since
-// signal-based shutdown does not reach a service process.
-func stopServe() error {
-	cancelMu.Lock()
-	cancel := serveCancel
-	cancelMu.Unlock()
-	if cancel == nil {
-		return nil
+// stopServe ends a running daemon. The Windows service handler needs it
+// because the service control manager's Stop does not raise a signal.
+func stopServe() {
+	stopMu.Lock()
+	stop := serveStop
+	stopMu.Unlock()
+	if stop != nil {
+		stop()
 	}
-	cancel()
-	return nil
+}
+
+func registerStop(stop context.CancelFunc) {
+	stopMu.Lock()
+	serveStop = stop
+	stopMu.Unlock()
 }
 
 var (
-	cancelMu    sync.Mutex
-	serveCancel context.CancelFunc
+	stopMu    sync.Mutex
+	serveStop context.CancelFunc
 )

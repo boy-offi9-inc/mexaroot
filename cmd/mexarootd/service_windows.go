@@ -31,8 +31,6 @@ type serviceHandler struct{}
 func (h *serviceHandler) Execute(_ []string, req <-chan svc.ChangeRequest, status chan<- svc.Status) (bool, uint32) {
 	status <- svc.Status{State: svc.StartPending}
 
-	// The service context carries no signals: cancellation and shutdown are
-	// driven by the SCM requests handled below.
 	exit := make(chan error, 1)
 	go func() { exit <- mainWithError() }()
 
@@ -48,9 +46,7 @@ func (h *serviceHandler) Execute(_ []string, req <-chan svc.ChangeRequest, statu
 				status <- c.CurrentStatus
 			case svc.Stop, svc.Shutdown:
 				status <- svc.Status{State: svc.StopPending}
-				if err := stopServe(); err != nil {
-					return false, 1
-				}
+				stopServe()
 				return false, exitCode(<-exit)
 			}
 		}
