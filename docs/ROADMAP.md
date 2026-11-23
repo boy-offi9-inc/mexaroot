@@ -3,8 +3,9 @@
 What exists today: one authenticated daemon, runtimes for native Termux and
 the host, proot-distro and Proroot, exec, interactive shell, push and pull
 (256 MiB cap, SHA-256 verified), status, doctor, `-json`, shell completion,
-wake lock, termux-services install, desktop daemon recipes, an MCP server,
-13 ADRs, CI, a security policy, and tagged releases with binaries for four
+wake lock, termux-services install, desktop daemon recipes, a Windows
+service implementation, an MCP server,
+14 ADRs, CI, a security policy, and tagged releases with binaries for four
 platforms. Not yet in place: automated pairing, a companion app. This page
 tracks what is open and the order to take it in.
 
@@ -12,8 +13,16 @@ tracks what is open and the order to take it in.
 
 ### Correctness and documentation to verify first
 
-- [ ] Windows service install: the README registers `mexarootd.exe` with `sc create`, but a plain console program normally cannot run under the Windows service manager (fails to start with error 1053), and ADR 0013's claim that plain supervision is enough needs testing - fix by implementing the service protocol (`golang.org/x/sys/windows/svc`), or switch the docs to a wrapper such as NSSM or WinSW, or to Task Scheduler. Verify on Windows
-- [ ] Windows interactive sessions: pseudo-terminal support was Unix-only in the original code; the README says desktop sessions work - either ConPTY support exists, or the README states which platforms support shell. Verify on Windows
+- [x] Windows service install - shipped: `mexarootd.exe` implements the Windows
+  service protocol (`golang.org/x/sys/windows/svc`), so the `sc create` recipe
+  in the README starts and stops the daemon like any native service instead of
+  failing with error 1053; ADR 0013's plain-supervision claim is corrected by
+  ADR 0014 (`cmd/mexarootd/service_windows.go`). Runtime verification on a real
+  Windows machine is still pending and tracked under "Device verification needed"
+- [ ] Windows interactive sessions: ConPTY support does not exist (the Windows
+  PTY path returns `ErrPTYUnsupported`, `internal/runtimes/hostexec/pty_windows.go`);
+  the README now states that shell is not available on Windows while exec, push,
+  pull, status and doctor are. Verify on Windows
 - [ ] Private vulnerability reporting: `SECURITY.md` tells reporters to use GitHub's private reporting option - enable it in the repository security settings
 
 ### Installation
@@ -55,14 +64,14 @@ remote use.
 ## Suggested order
 
 1. Correctness fixes (Windows service, vulnerability reporting)
-2. Pairing with TLS and per-device tokens
-3. Port forwarding into runtimes
-4. Companion app
-5. Ongoing quality items
+3. Pairing with TLS and per-device tokens
+4. Port forwarding into runtimes
+5. Companion app
+6. Ongoing quality items
 
 ## Device verification needed
 
-- The Windows service recipe and shell on Windows
+- The Windows service recipe and shell on Windows (the service protocol is now implemented; the recipe itself still needs a run on real hardware)
 - A static Linux arm64 binary running in Termux
 - Proroot options and the guest environment baseline on real hardware
 - Behaviour of the wake lock and runit service across a reboot

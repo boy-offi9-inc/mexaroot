@@ -15,5 +15,6 @@
 | [0011](0011-staying-alive-on-android.md) | Staying alive under Android background limits |
 | [0012](0012-chunked-binary-file-transfer.md) | Chunked binary frames for file transfer |
 | [0013](0013-desktop-sessions.md) | Desktop sessions |
+| [0014](0014-windows-service-protocol.md) | Windows service protocol |
 
 Each record states its context, the decision taken, and the resulting consequences. A superseded record keeps its place and is marked with the record that replaces it.

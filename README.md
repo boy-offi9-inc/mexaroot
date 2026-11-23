@@ -96,7 +96,10 @@ The agent starts on login and restarts on failure. Pair and connect exactly as o
 
 ### Windows
 
-Build `mexaroot.exe` and `mexarootd.exe` with `GOOS=windows GOARCH=amd64`, then register the daemon with Service Control Manager from an elevated prompt:
+Build `mexaroot.exe` and `mexarootd.exe` with `GOOS=windows GOARCH=amd64`. The
+daemon talks the Windows service protocol (`golang.org/x/sys/windows/svc`), so
+`sc create` works directly: the service manager can start and stop it like any
+native service. Register it from an elevated prompt:
 
 ```bat
 sc create mexarootd binPath= "C:\Program Files\mexaroot\mexarootd.exe -addr 127.0.0.1:8750" start= auto
@@ -104,7 +107,7 @@ sc start mexarootd
 sc query mexarootd
 ```
 
-`start= auto` survives reboot, and Windows restarts the service on failure through its default recovery policy (set explicitly with `sc failure mexarootd reset= 0 actions= restart/5000` if needed). Remove it with `sc stop mexarootd && sc delete mexarootd`. No `svc` wrapper ships; plain process supervision is enough (ADR 0013). Client commands are the same from PowerShell, e.g. `mexaroot.exe exec host -- hostname` (the native runtime is `host` outside Android, `termux` inside Termux).
+`start= auto` survives reboot, and Windows restarts the service on failure through its default recovery policy (set explicitly with `sc failure mexarootd reset= 0 actions= restart/5000` if needed). Remove it with `sc stop mexarootd && sc delete mexarootd`. Started from a terminal, the daemon behaves as a plain console program. See ADR 0014. Client commands are the same from PowerShell, e.g. `mexaroot.exe exec host -- hostname` (the native runtime is `host` outside Android, `termux` inside Termux). Interactive shell is the one exception: it needs a pseudo-terminal, which is implemented on Linux, macOS and Android but not yet on Windows (ConPTY support is open on the roadmap); `exec`, `push`, `pull`, `status` and `doctor` all work.
 
 On all three, a desktop daemon is reachable from another machine through the same SSH tunnel documented below; loopback binding is kept by default.
 

@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 
 	"github.com/boy-offi9-inc/mexaroot/internal/auth"
@@ -34,8 +35,10 @@ type options struct {
 	auditFile    string
 }
 
-func main() {
+func parseOptions(argv []string) (options, error) {
 	var opts options
+	flag.CommandLine.Init("mexarootd", flag.ContinueOnError)
+	flag.CommandLine.SetOutput(os.Stderr)
 	flag.StringVar(&opts.addr, "addr", defaultAddr, "address to listen on")
 	flag.StringVar(&opts.tokenFile, "token-file", "", "path to the pairing token file")
 	flag.BoolVar(&opts.allowRemote, "allow-non-loopback", false, "permit listening on non-loopback addresses")
@@ -47,7 +50,9 @@ func main() {
 	installService := flag.Bool("install-service", false, "install a termux-services service and exit")
 	uninstallService := flag.Bool("uninstall-service", false, "remove the termux-services service and exit")
 	showVersion := flag.Bool("version", false, "print the version and exit")
-	flag.Parse()
+	if err := flag.CommandLine.Parse(argv); err != nil {
+		return opts, err
+	}
 
 	var err error
 	switch {
@@ -62,8 +67,16 @@ func main() {
 	default:
 		err = serve(opts)
 	}
+	return opts, err
+}
+
+func main() {
+	_, err := parseOptions(os.Args[1:])
 	if err != nil {
-		log.Fatalf("mexarootd: %v", err)
+		if !errors.Is(err, flag.ErrHelp) {
+			log.Fatalf("mexarootd: %v", err)
+		}
+		os.Exit(2)
 	}
 }
 
@@ -154,7 +167,12 @@ func acquireWakeLock(styler ui.Styler) func() {
 	}
 }
 
-func serve(opts options) error {
+func serveContext(opts options, ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	cancelMu.Lock()
+	serveCancel = cancel
+	cancelMu.Unlock()
 	token, err := loadToken(opts.tokenFile)
 	if err != nil {
 		return err
@@ -187,12 +205,34 @@ func serve(opts options) error {
 		return err
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
 	fmt.Fprintf(os.Stderr, "\n  %s listening on %s\n\n", styler.Paint(ui.Green, "●"), styler.Bold(opts.addr))
 	if opts.auditFile != "" {
 		fmt.Fprintf(os.Stderr, "  %s audit log at %s\n", styler.Paint(ui.Green, "●"), opts.auditFile)
 	}
 	return srv.ListenAndServe(ctx)
 }
+
+func serve(opts options) error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	return serveContext(opts, ctx)
+}
+
+// stopServe cancels the daemon's context; the Windows service handler calls
+// it from Execute when the service control manager requests Stop, since
+// signal-based shutdown does not reach a service process.
+func stopServe() error {
+	cancelMu.Lock()
+	cancel := serveCancel
+	cancelMu.Unlock()
+	if cancel == nil {
+		return nil
+	}
+	cancel()
+	return nil
+}
+
+var (
+	cancelMu    sync.Mutex
+	serveCancel context.CancelFunc
+)

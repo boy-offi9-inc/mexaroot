@@ -20,6 +20,10 @@ version bumps.
   replays the buffer and continues the session — shells survive Wi-Fi drops.
   New `session.list` and `session.attach` messages (documented in
   `protocol/PROTOCOL.md`).
+- Windows service support: `mexarootd.exe` implements the Windows service
+  protocol (`golang.org/x/sys/windows/svc`), so `sc create` starts and stops
+  the daemon like any native service instead of failing with error 1053
+  (ADR 0014).
 
 ## 0.1.0 - unreleased
 
