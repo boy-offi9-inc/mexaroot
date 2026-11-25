@@ -36,10 +36,9 @@ jobs:
       - name: govulncheck
         uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1.1.0
         with:
-          # setup-go already installed the toolchain from go.mod above;
-          # the action's own "go.mod" resolution fails with
-          # "Unable to find Go version" on this repo, so skip its setup
-          go-version-input: false
+          # the action runs its own setup-go regardless; "stable" (>=1.26)
+          # satisfies go.mod, while "go.mod" fails resolution on this repo
+          go-version-input: stable
           go-package: ./...
 
   build:
