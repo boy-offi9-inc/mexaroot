@@ -25,6 +25,13 @@ version bumps.
   the daemon like any native service instead of failing with error 1053
   (ADR 0014).
 
+### Changed
+
+- Dependencies: `golang.org/x/term` v0.47.0 -> v0.48.0 and
+  `golang.org/x/sys` v0.49.0 -> v0.50.0. `coder/websocket` and
+  `creack/pty` were already at latest. Verified with `go build`, `go vet`
+  and the full test suite on Go 1.27.4.
+
 ## 0.1.0 - unreleased
 
 The first tagged release: one authenticated daemon bridging Termux, proot
