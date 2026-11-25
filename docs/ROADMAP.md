@@ -23,7 +23,7 @@ tracks what is open and the order to take it in.
   PTY path returns `ErrPTYUnsupported`, `internal/runtimes/hostexec/pty_windows.go`);
   the README now states that shell is not available on Windows while exec, push,
   pull, status and doctor are. Verify on Windows
-- [ ] Private vulnerability reporting: `SECURITY.md` tells reporters to use GitHub's private reporting option - enable it in the repository security settings
+- [x] Private vulnerability reporting - enabled in the repository security settings (2026-11-25); `SECURITY.md` already points reporters there. Dependabot alerts are on too.
 
 ### Installation
 
@@ -38,7 +38,7 @@ remote use.
 - [ ] Pairing flow: `mexarootd -pair` shows a QR code or URI that encodes the address and a one-time secret, and the client saves a named host
 - [ ] Per-device tokens with listing, revocation and rotation
 - [ ] Built-in TLS with a pinned certificate fingerprint, as an alternative to the SSH tunnel
-- [ ] Remove the need for `-token` on the command line, since it is visible in the process list (environment variable and file already exist)
+- [x] Remove the need for `-token` on the command line - the env var and `-token-file` have existed for a while; the README now actively recommends them over `-token` (2026-11-25)
 - [ ] Optional per-runtime or read-only permissions for a token
 
 ### Features
@@ -53,12 +53,12 @@ remote use.
 
 ## Quality and project health
 
-- [ ] Add govulncheck and Dependabot, and pin GitHub Actions to commit SHAs
+- [x] Add govulncheck and Dependabot, and pin GitHub Actions to commit SHAs - shipped: govulncheck job in ci.yml (manual run: no vulnerabilities), Dependabot on gomod + github-actions weekly, checkout/setup-go/goreleaser-action pinned
 - [ ] Run tests on macOS and Windows as well; the current workflow tests on Ubuntu only, with cross-builds for the other platforms (verify)
-- [ ] Fuzz the wire decoder and add protocol conformance tests
+- [x] Fuzz the wire decoder - shipped: `internal/wire/fuzz_test.go` (seed corpus runs in CI; a 60s live run at ~8.5k execs/s found only an over-strict assertion in the fuzz contract itself, no decoder bugs). Protocol conformance tests still open.
 - [ ] Add a CI integration test that starts the daemon and drives a real PTY session
 - [ ] Publish a compatibility matrix: Android versions, Termux builds, proot-distro and Proroot versions, with the checks done by `mexaroot doctor`
-- [ ] Issue and pull request templates, labelled starter issues, and a short architecture overview for contributors
+- [x] Issue and pull request templates - shipped (bug report, feature request, PR template with a protocol-impact checklist). Starter issues and the architecture overview still open.
 - [ ] Keep the README claims in step with the code
 
 ## Suggested order

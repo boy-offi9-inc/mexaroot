@@ -148,7 +148,7 @@ mexaroot doctor                                # checks each link in the chain, 
 
 Shell with no runtime argument opens a numbered menu. `-json` works on `runtimes`, `exec`, `status`, and `doctor`. Completions: `source <(mexaroot completion bash)` (zsh and fish too). Colors follow the terminal, with `-no-color` / `NO_COLOR` / `FORCE_COLOR` to override.
 
-**File transfer details:** remote paths resolve *inside the runtime's filesystem* (`/root/…` is the distro's root, not Android's), escapes are refused, and every transfer is size- and SHA-256-verified by both ends. Cap: 256 MiB. The token can also come from `-token <token>` or `-token-file <path>`.
+**File transfer details:** remote paths resolve *inside the runtime's filesystem* (`/root/…` is the distro's root, not Android's), escapes are refused, and every transfer is size- and SHA-256-verified by both ends. Cap: 256 MiB. Prefer `MEXAROOT_TOKEN` or `-token-file <path>` over `-token <token>` - a token on the command line is visible to any local user who can read the process list.
 
 Installed proot-distro distros register automatically by alias (`mexaroot exec ubuntu -- cat /etc/os-release`); with a Proroot launcher on the path, each also registers as `<alias>-proroot`.
 

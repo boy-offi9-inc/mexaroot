@@ -27,6 +27,13 @@ version bumps.
 
 ### Changed
 
+- Project health: govulncheck runs in CI (plus a manual run today reports no
+  vulnerabilities), GitHub Actions are pinned to commit SHAs, Dependabot
+  watches Go modules and actions weekly, bug/feature/PR templates exist, and
+  the wire decoder is fuzzed (`internal/wire/fuzz_test.go`; the seed corpus
+  runs in CI, live fuzzing found and drove out one over-strict round-trip
+  assertion, no decoder bugs). The README now recommends `MEXAROOT_TOKEN` or
+  `-token-file` over `-token`, which is visible in the process list.
 - Dependencies: `golang.org/x/term` v0.47.0 -> v0.48.0 and
   `golang.org/x/sys` v0.49.0 -> v0.50.0. `coder/websocket` and
   `creack/pty` were already at latest. Verified with `go build`, `go vet`

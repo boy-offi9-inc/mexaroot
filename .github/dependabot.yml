@@ -1,0 +1,12 @@
+version: 2
+updates:
+  # Go module dependencies - the daemon's whole supply chain
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+  # GitHub Actions - keep the pinned SHAs current with their version tags
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
