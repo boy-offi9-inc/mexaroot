@@ -308,7 +308,7 @@ func resolveRuntimePath(root, guest string) (string, error) {
 		}
 		target = path.Join(rootSlash, clean)
 	}
-	rel, err := path.Rel(rootSlash, target)
+	rel, err := filepath.Rel(rootSlash, target)
 	if err != nil || rel == ".." || strings.HasPrefix(rel, "../") {
 		return "", &wire.Error{Code: wire.CodeInvalidRequest, Message: ErrPathOutsideRoot.Error()}
 	}
