@@ -3,6 +3,7 @@ package client_test
 import (
 	"context"
 	"encoding/base64"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -59,6 +60,9 @@ func awaitExit(ctx context.Context, t *testing.T, c *client.Client) {
 }
 
 func TestClientSession(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no ConPTY on Windows yet; shell sessions are documented as unavailable")
+	}
 	url := startServer(t, "secret")
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()

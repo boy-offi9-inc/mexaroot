@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -78,6 +79,9 @@ func randomFile(t *testing.T, dir string, size int) (string, []byte) {
 }
 
 func TestClientPushPullRoundTrip(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("file modes are a Unix concept; Windows reports 0666 for every file")
+	}
 	root := t.TempDir()
 	c := connectClient(t, startFileServer(t, root))
 

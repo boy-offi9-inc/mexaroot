@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"net/http/httptest"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -113,6 +114,9 @@ func startShell(ctx context.Context, t *testing.T, conn *websocket.Conn, shell s
 }
 
 func TestSessionLifecycle(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no ConPTY on Windows yet; shell sessions are documented as unavailable")
+	}
 	ctx, conn := dial(t, newTestServer(t))
 	authenticate(ctx, t, conn)
 	stream := startShell(ctx, t, conn, "cat")
@@ -143,6 +147,9 @@ func TestSessionLifecycle(t *testing.T) {
 }
 
 func TestSessionResize(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no ConPTY on Windows yet; shell sessions are documented as unavailable")
+	}
 	ctx, conn := dial(t, newTestServer(t))
 	authenticate(ctx, t, conn)
 	stream := startShell(ctx, t, conn, "cat")
@@ -162,6 +169,9 @@ func TestSessionUnknownStream(t *testing.T) {
 }
 
 func TestSessionInvalidInputData(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no ConPTY on Windows yet; shell sessions are documented as unavailable")
+	}
 	ctx, conn := dial(t, newTestServer(t))
 	authenticate(ctx, t, conn)
 	stream := startShell(ctx, t, conn, "cat")

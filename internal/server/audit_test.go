@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -63,6 +64,9 @@ func TestAuditWritesJSONLines(t *testing.T) {
 }
 
 func TestAuditFileIsMode0600(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("chmod is a Unix concept; Windows reports 0666 for every file")
+	}
 	dir := t.TempDir()
 	path := filepath.Join(dir, "audit.jsonl")
 	a, err := newAuditLog(path)

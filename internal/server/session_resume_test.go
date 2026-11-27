@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"net/http/httptest"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -53,6 +54,9 @@ func serverURLFor(t *testing.T, srv *Server) string {
 // running after that connection drops, and a second connection can attach
 // to it and receive output produced after the drop.
 func TestSessionSurvivesDisconnect(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no ConPTY on Windows yet; shell sessions are documented as unavailable")
+	}
 	srv := mustServer(t)
 	url := serverURLFor(t, srv)
 	ctx, conn := dial(t, url)
@@ -102,6 +106,9 @@ func TestSessionSurvivesDisconnect(t *testing.T) {
 // TestSessionReplayOnAttach: output produced while detached is replayed
 // before new output.
 func TestSessionReplayOnAttach(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no ConPTY on Windows yet; shell sessions are documented as unavailable")
+	}
 	srv := mustServer(t)
 	url := serverURLFor(t, srv)
 	ctx, conn := dial(t, url)
@@ -159,6 +166,9 @@ func TestSessionReplayOnAttach(t *testing.T) {
 // TestSessionGraceExpiry: a detached session is closed after the grace
 // period and disappears from the registry.
 func TestSessionGraceExpiry(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no ConPTY on Windows yet; shell sessions are documented as unavailable")
+	}
 	srv := mustServerWithGrace(t, 1*time.Second)
 	url := serverURLFor(t, srv)
 	ctx, conn := dial(t, url)
@@ -192,6 +202,9 @@ func TestSessionGraceExpiry(t *testing.T) {
 // TestSessionAttachConflict: a second connection cannot attach to a
 // session that another connection owns; after the owner drops, it can.
 func TestSessionAttachConflict(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no ConPTY on Windows yet; shell sessions are documented as unavailable")
+	}
 	srv := mustServer(t)
 	url := serverURLFor(t, srv)
 	ctx1, conn1 := dial(t, url)

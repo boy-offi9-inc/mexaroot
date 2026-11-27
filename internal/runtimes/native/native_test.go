@@ -66,6 +66,9 @@ func TestExecReportsExitCode(t *testing.T) {
 }
 
 func TestExecAppliesEnvAndCwd(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the test speaks POSIX sh; the MSYS sh a Windows runner resolves translates paths, so the assertion is meaningless there")
+	}
 	dir, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
 		t.Fatalf("EvalSymlinks: %v", err)
