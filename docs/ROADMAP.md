@@ -5,7 +5,7 @@ the host, proot-distro and Proroot, exec, interactive shell, push and pull
 (256 MiB cap, SHA-256 verified), status, doctor, `-json`, shell completion,
 wake lock, termux-services install, desktop daemon recipes, a Windows
 service implementation, an MCP server,
-14 ADRs, CI, a security policy, and tagged releases with binaries for four
+15 ADRs, CI, a security policy, and tagged releases with binaries for four
 platforms. Not yet in place: automated pairing, a companion app. This page
 tracks what is open and the order to take it in.
 
@@ -54,8 +54,9 @@ remote use.
 ## Quality and project health
 
 - [x] Add govulncheck and Dependabot, and pin GitHub Actions to commit SHAs - shipped: govulncheck job in ci.yml (manual run: no vulnerabilities), Dependabot on gomod + github-actions weekly, checkout/setup-go/goreleaser-action pinned
-- [ ] Run tests on macOS and Windows as well; the current workflow tests on Ubuntu only, with cross-builds for the other platforms (verify)
-- [x] Fuzz the wire decoder - shipped: `internal/wire/fuzz_test.go` (seed corpus runs in CI; a 60s live run at ~8.5k execs/s found only an over-strict assertion in the fuzz contract itself, no decoder bugs). Protocol conformance tests still open.
+- [x] Run tests on macOS and Windows as well - shipped: the ci.yml test job is a matrix over ubuntu, macOS and Windows runners (gofmt stays Ubuntu-only; its output is identical everywhere). Cross-platform regressions now fail CI instead of waiting for a user report (2026-11-27)
+- [x] Fuzz the wire decoder - shipped: `internal/wire/fuzz_test.go` (seed corpus runs in CI; a 60s live run at ~8.5k execs/s found only an over-strict assertion in the fuzz contract itself, no decoder bugs)
+- [x] Protocol conformance tests - shipped: `internal/wire/conformance_test.go` locks the protocol contract every peer must satisfy: envelope round trips (v/id/type/ok/stream/payload/error), decode rejections (`CodeInvalidRequest` on malformed JSON, missing type or version), unknown future types still decoding with no capability claim, every declared type mapped to a capability, negotiation semantics (highest common version, empty/no-overlap lists), chunk framing limits and error/event envelopes
 - [ ] Add a CI integration test that starts the daemon and drives a real PTY session
 - [ ] Publish a compatibility matrix: Android versions, Termux builds, proot-distro and Proroot versions, with the checks done by `mexaroot doctor`
 - [x] Issue and pull request templates - shipped (bug report, feature request, PR template with a protocol-impact checklist). Starter issues and the architecture overview still open.
@@ -63,11 +64,11 @@ remote use.
 
 ## Suggested order
 
-1. Correctness fixes (Windows service, vulnerability reporting)
-3. Pairing with TLS and per-device tokens
-4. Port forwarding into runtimes
-5. Companion app
-6. Ongoing quality items
+1. Pairing with TLS and per-device tokens (both correctness items are shipped)
+2. Port forwarding into runtimes
+3. Companion app
+4. Streaming exec with cancel
+5. Ongoing quality items
 
 ## Device verification needed
 
