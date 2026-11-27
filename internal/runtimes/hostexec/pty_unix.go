@@ -32,8 +32,7 @@ func StartPTY(c Command, cols, rows int) (runtimes.Session, error) {
 	}
 
 	// Same contract as hostexec.Run: direct argv exec, no shell.
-	// codeql[go/command-injection]
-	cmd := exec.Command(c.Name, c.Args...)
+	cmd := exec.Command(c.Name, c.Args...) // codeql[go/command-injection] direct argv exec of the authenticated client's own request, no shell
 	cmd.Dir = c.Dir
 	cmd.Env = c.Env
 
