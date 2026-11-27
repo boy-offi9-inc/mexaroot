@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -286,20 +287,29 @@ func (c *connection) doneEvent(ctx context.Context, stream uint32, err error) {
 	c.sendEvent(ctx, wire.TypeFileDone, stream, payload)
 }
 
-func resolveRuntimePath(root, path string) (string, error) {
-	if path == "" {
+func resolveRuntimePath(root, guest string) (string, error) {
+	if guest == "" {
 		return "", &wire.Error{Code: wire.CodeInvalidRequest, Message: "path is required"}
 	}
-	clean := filepath.Clean(path)
+	// Guest paths are POSIX by protocol contract ("dir/sub/file", "/data/..."),
+	// even when the daemon runs on a host whose native separator is "\" — so
+	// this resolution always uses the POSIX path package. Go's os package
+	// accepts forward-slash paths on Windows, so the resolved target opens
+	// correctly there too.
+	rootSlash := filepath.ToSlash(root)
+	if rootSlash == "" {
+		rootSlash = "/"
+	}
+	clean := path.Clean(filepath.ToSlash(guest))
 	target := clean
-	if !filepath.IsAbs(clean) {
-		if clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+	if !path.IsAbs(clean) {
+		if clean == ".." || strings.HasPrefix(clean, "../") {
 			return "", &wire.Error{Code: wire.CodeInvalidRequest, Message: ErrPathOutsideRoot.Error()}
 		}
-		target = filepath.Join(root, clean)
+		target = path.Join(rootSlash, clean)
 	}
-	rel, err := filepath.Rel(root, target)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+	rel, err := path.Rel(rootSlash, target)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, "../") {
 		return "", &wire.Error{Code: wire.CodeInvalidRequest, Message: ErrPathOutsideRoot.Error()}
 	}
 	return target, nil
