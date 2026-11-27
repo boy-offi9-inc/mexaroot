@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -147,8 +148,8 @@ func TestDevicesListOrderAndPersistence(t *testing.T) {
 }
 
 func TestDevicesFilePermissions(t *testing.T) {
-	if os.Getenv("GOOS_TEST_WINDOWS") == "1" {
-		t.Skip("permissions are a Unix concept")
+	if runtime.GOOS == "windows" {
+		t.Skip("owner-only file modes are a Unix concept; Windows reports 0666")
 	}
 	path := filepath.Join(t.TempDir(), "devices.json")
 	s, err := OpenStore(path)
@@ -168,6 +169,9 @@ func TestDevicesFilePermissions(t *testing.T) {
 }
 
 func TestDevicesRejectsLooseFilePermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("chmod 0644 does not change the ACL on Windows; the mode check is Unix-only")
+	}
 	path := filepath.Join(t.TempDir(), "devices.json")
 	if err := os.WriteFile(path, []byte(`{"devices":[]}`), 0o644); err != nil {
 		t.Fatalf("seed: %v", err)
