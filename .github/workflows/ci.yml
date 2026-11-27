@@ -7,7 +7,14 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      # the protocol and runtimes are cross-platform; a fix must not break a
+      # client or daemon on the machines it ships for (roadmap: tests on
+      # macOS and Windows, not Ubuntu only)
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       # pinned to commit SHAs (v4.2.2 / v5.5.0) so a compromised upstream
       # action can't run in this repo
@@ -16,6 +23,8 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Check formatting
+        # gofmt output is identical on every platform; Ubuntu is enough
+        if: matrix.os == 'ubuntu-latest'
         run: test -z "$(gofmt -l .)"
       - name: Vet
         run: go vet ./...
