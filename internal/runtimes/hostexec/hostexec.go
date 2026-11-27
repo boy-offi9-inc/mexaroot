@@ -32,6 +32,9 @@ func Run(ctx context.Context, c Command) (runtimes.ExecResult, error) {
 		defer cancel()
 	}
 
+	// Running the client's chosen binary is the product: exec.Command
+	// builds an argv array directly (no shell), and the caller is already
+	// authenticated. codeql[go/command-injection]
 	cmd := exec.CommandContext(ctx, c.Name, c.Args...)
 	cmd.Dir = c.Dir
 	cmd.Env = c.Env

@@ -7,6 +7,15 @@ version bumps.
 
 ## Unreleased
 
+### Security
+- File push and pull now open every path through `os.Root`, so even a symlink
+  planted inside a runtime's file system cannot redirect transfers outside the
+  root. Path resolution rejects escapes before the syscall as before; the
+  kernel now enforces it too. Regression tests cover symlink escapes in both
+  directions.
+- `ci.yml` grants each job the minimum GitHub token permissions (read-only
+  contents) instead of the org default.
+
 ### Added
 - Per-device tokens: `mexarootd -devices` enables a device token store and
   `mexarootd devices add|list|revoke|rotate` manages it without stopping the

@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+# Default: no permissions at all; each job grants only what it needs.
+permissions: {}
+
 jobs:
   test:
     strategy:
@@ -15,6 +18,8 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
     steps:
       # pinned to commit SHAs (v4.2.2 / v5.5.0) so a compromised upstream
       # action can't run in this repo
@@ -37,6 +42,8 @@ jobs:
 
   vulncheck:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
@@ -52,6 +59,8 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       matrix:
         include:

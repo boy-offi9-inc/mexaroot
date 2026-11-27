@@ -84,19 +84,27 @@ func (c *connection) receivePush(ctx context.Context, stream uint32, tr *fileTra
 
 	done := func(err error) { c.doneEvent(ctx, stream, err) }
 
-	target, err := resolveRuntimePath(root, params.Path)
+	rel, err := resolveRuntimeRel(root, params.Path)
 	if err != nil {
 		done(err)
 		return
 	}
-	if dir := filepath.Dir(target); dir != "." {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
+	// Every operation below goes through os.Root, so even a symlink planted
+	// inside the runtime root cannot redirect the write outside of it.
+	rd, err := os.OpenRoot(root)
+	if err != nil {
+		done(fmt.Errorf("open runtime root: %w", err))
+		return
+	}
+	defer rd.Close()
+	if dir := path.Dir(rel); dir != "." {
+		if err := rd.MkdirAll(dir, 0o755); err != nil {
 			done(fmt.Errorf("create directory: %w", err))
 			return
 		}
 	}
 
-	file, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, fileMode(params.Mode))
+	file, err := rd.OpenFile(rel, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, fileMode(params.Mode))
 	if err != nil {
 		done(fileError("create", err))
 		return
@@ -107,16 +115,16 @@ func (c *connection) receivePush(ctx context.Context, stream uint32, tr *fileTra
 	closeErr := file.Close()
 	switch {
 	case recvErr != nil:
-		os.Remove(target)
+		rd.Remove(rel)
 		done(recvErr)
 	case closeErr != nil:
-		os.Remove(target)
+		rd.Remove(rel)
 		done(fileError("close", closeErr))
 	case written != params.Size:
-		os.Remove(target)
+		rd.Remove(rel)
 		done(fmt.Errorf("size mismatch: received %d of %d bytes", written, params.Size))
 	case hex.EncodeToString(hash.Sum(nil)) != strings.ToLower(params.SHA256):
-		os.Remove(target)
+		rd.Remove(rel)
 		done(fmt.Errorf("sha256 mismatch"))
 	default:
 		done(nil)
@@ -139,12 +147,27 @@ func (c *connection) handleFilePull(ctx context.Context, req wire.Message) {
 		return
 	}
 
-	target, err := resolveRuntimePath(root, params.Path)
+	rel, err := resolveRuntimeRel(root, params.Path)
 	if err != nil {
 		c.send(ctx, errorResponse(req, err))
 		return
 	}
-	info, err := os.Stat(target)
+	// os.Root confines the open to the runtime root, including refusing
+	// symlinks that point outside it.
+	rd, err := os.OpenRoot(root)
+	if err != nil {
+		c.send(ctx, errorResponse(req, fmt.Errorf("open runtime root: %w", err)))
+		return
+	}
+	defer rd.Close()
+	file, err := rd.Open(rel)
+	if err != nil {
+		c.send(ctx, errorResponse(req, fileError("open", err)))
+		return
+	}
+	defer file.Close()
+
+	info, err := file.Stat()
 	if err != nil {
 		c.send(ctx, errorResponse(req, fileError("stat", err)))
 		return
@@ -157,13 +180,6 @@ func (c *connection) handleFilePull(ctx context.Context, req wire.Message) {
 		c.send(ctx, errorResponse(req, &wire.Error{Code: wire.CodeInvalidRequest, Message: fmt.Sprintf("file exceeds the %d byte transfer limit", maxTransferSize)}))
 		return
 	}
-	file, err := os.Open(target)
-	if err != nil {
-		c.send(ctx, errorResponse(req, fileError("open", err)))
-		return
-	}
-	defer file.Close()
-
 	// Hash the whole file before announcing the stream so the
 	// response always carries a digest the client can verify.
 	hasher := sha256.New()
@@ -287,7 +303,11 @@ func (c *connection) doneEvent(ctx context.Context, stream uint32, err error) {
 	c.sendEvent(ctx, wire.TypeFileDone, stream, payload)
 }
 
-func resolveRuntimePath(root, guest string) (string, error) {
+// resolveRuntimeRel resolves a guest path to a slash path relative to the
+// runtime root, rejecting anything that escapes it. The result is safe to
+// pass to os.Root operations, which enforce the same containment at the
+// kernel level (including refusing symlink escapes).
+func resolveRuntimeRel(root, guest string) (string, error) {
 	if guest == "" {
 		return "", &wire.Error{Code: wire.CodeInvalidRequest, Message: "path is required"}
 	}
@@ -301,18 +321,35 @@ func resolveRuntimePath(root, guest string) (string, error) {
 		rootSlash = "/"
 	}
 	clean := path.Clean(filepath.ToSlash(guest))
-	target := clean
+	rel := clean
 	if !path.IsAbs(clean) {
 		if clean == ".." || strings.HasPrefix(clean, "../") {
 			return "", &wire.Error{Code: wire.CodeInvalidRequest, Message: ErrPathOutsideRoot.Error()}
 		}
-		target = path.Join(rootSlash, clean)
+	} else {
+		// Absolute guest paths live inside the root: strip the root prefix.
+		var err error
+		rel, err = filepath.Rel(rootSlash, clean)
+		if err != nil || rel == ".." || strings.HasPrefix(rel, "../") {
+			return "", &wire.Error{Code: wire.CodeInvalidRequest, Message: ErrPathOutsideRoot.Error()}
+		}
 	}
-	rel, err := filepath.Rel(rootSlash, target)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, "../") {
-		return "", &wire.Error{Code: wire.CodeInvalidRequest, Message: ErrPathOutsideRoot.Error()}
+	return rel, nil
+}
+
+// resolveRuntimePath returns the host path a guest path resolves to. New
+// file operations should prefer resolveRuntimeRel with os.Root, which
+// confines every syscall to the runtime root.
+func resolveRuntimePath(root, guest string) (string, error) {
+	rel, err := resolveRuntimeRel(root, guest)
+	if err != nil {
+		return "", err
 	}
-	return target, nil
+	rootSlash := filepath.ToSlash(root)
+	if rootSlash == "" {
+		rootSlash = "/"
+	}
+	return path.Join(rootSlash, rel), nil
 }
 
 func receiveChunks(tr *fileTransfer, dst io.Writer, size int64) (int64, error) {

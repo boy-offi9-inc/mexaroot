@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -386,3 +387,51 @@ func TestFilePullDirectoryRejected(t *testing.T) {
 }
 
 var _ = io.EOF
+
+func TestFilePullSymlinkEscapeRejected(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlinks need privileges on Windows")
+	}
+	root := t.TempDir()
+	outside := t.TempDir()
+	secret := filepath.Join(outside, "secret.txt")
+	if err := os.WriteFile(secret, []byte("secret"), 0o600); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	if err := os.Symlink(secret, filepath.Join(root, "leak.txt")); err != nil {
+		t.Fatalf("symlink: %v", err)
+	}
+	ctx, conn := dial(t, newFileTestServerURL(t, root))
+	authenticate(ctx, t, conn)
+	resp := call(ctx, t, conn, wire.TypeFilePull, wire.FilePullRequest{Runtime: "testfs", Path: "leak.txt"})
+	// Any error is fine as long as the secret never leaves the root; os.Root
+	// reports the refusal with its own openat error rather than a wire code.
+	if resp.OK != nil && *resp.OK {
+		t.Fatalf("symlink escape pull was served: %+v", resp)
+	}
+}
+
+func TestFilePushSymlinkEscapeRejected(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlinks need privileges on Windows")
+	}
+	root := t.TempDir()
+	outside := t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(root, "escape")); err != nil {
+		t.Fatalf("symlink: %v", err)
+	}
+	ctx, conn := dial(t, newFileTestServerURL(t, root))
+	authenticate(ctx, t, conn)
+	resp := call(ctx, t, conn, wire.TypeFilePush, wire.FilePushRequest{
+		Runtime: "testfs",
+		Path:    "escape/inside.txt",
+		Size:    0,
+		SHA256:  digest(nil),
+	})
+	// Whether the daemon errors or acks the push, the file must never
+	// land outside the runtime root — os.Root has the last word.
+	_ = resp
+	if _, err := os.Stat(filepath.Join(outside, "inside.txt")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("push escaped the runtime root through a symlinked directory")
+	}
+}
