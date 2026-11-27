@@ -28,6 +28,7 @@ const defaultAddr = "127.0.0.1:8750"
 type options struct {
 	addr         string
 	tokenFile    string
+	devicesFile  string
 	allowRemote  bool
 	forwardAllow string
 	noColor      bool
@@ -37,10 +38,14 @@ type options struct {
 
 func parseOptions(argv []string) (options, error) {
 	var opts options
+	if len(argv) > 0 && argv[0] == "devices" {
+		return opts, devicesCommand(argv[1:])
+	}
 	flag.CommandLine.Init("mexarootd", flag.ContinueOnError)
 	flag.CommandLine.SetOutput(os.Stderr)
 	flag.StringVar(&opts.addr, "addr", defaultAddr, "address to listen on")
 	flag.StringVar(&opts.tokenFile, "token-file", "", "path to the pairing token file")
+	flag.StringVar(&opts.devicesFile, "devices", "", "path to the per-device token store (enables per-device tokens; off by default)")
 	flag.BoolVar(&opts.allowRemote, "allow-non-loopback", false, "permit listening on non-loopback addresses")
 	flag.StringVar(&opts.forwardAllow, "forward-allow", "", "comma-separated hosts port forwarding may dial, or * for any (default: loopback only)")
 	flag.BoolVar(&opts.noColor, "no-color", false, "disable colored output")
@@ -100,6 +105,86 @@ func loadToken(path string) (string, error) {
 		path = defaultPath
 	}
 	return auth.LoadOrCreate(path)
+}
+
+func devicesPath(path string) (string, error) {
+	if path != "" {
+		return path, nil
+	}
+	return auth.DefaultDevicesPath()
+}
+
+// devicesCommand manages per-device tokens without starting the daemon:
+//
+//	mexarootd devices add <name>
+//	mexarootd devices list
+//	mexarootd devices revoke <name>
+//	mexarootd devices rotate <name>
+func devicesCommand(args []string) error {
+	fs := flag.NewFlagSet("mexarootd devices", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	path := fs.String("devices", "", "path to the per-device token store (default: next to the shared token)")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	store, err := devicesPath(*path)
+	if err != nil {
+		return err
+	}
+	if fs.NArg() < 1 {
+		return fmt.Errorf("usage: mexarootd devices {add|list|revoke|rotate} [name]")
+	}
+	s, err := auth.OpenStore(store)
+	if err != nil {
+		return err
+	}
+	switch fs.Arg(0) {
+	case "add":
+		if fs.NArg() != 2 {
+			return fmt.Errorf("usage: mexarootd devices add <name>")
+		}
+		device, err := s.Create(fs.Arg(1))
+		if err != nil {
+			return err
+		}
+		fmt.Printf("device %s created with token:\n%s\n", device.Name, device.Token)
+	case "list":
+		list, err := s.List()
+		if err != nil {
+			return err
+		}
+		if len(list) == 0 {
+			fmt.Println("no devices")
+			return nil
+		}
+		for _, d := range list {
+			rotated := ""
+			if d.RotatedAt != nil {
+				rotated = fmt.Sprintf(" (rotated %s)", d.RotatedAt.Format("2006-01-02"))
+			}
+			fmt.Printf("%s  created %s%s\n", d.Name, d.CreatedAt.Format("2006-01-02"), rotated)
+		}
+	case "revoke":
+		if fs.NArg() != 2 {
+			return fmt.Errorf("usage: mexarootd devices revoke <name>")
+		}
+		if err := s.Revoke(fs.Arg(1)); err != nil {
+			return err
+		}
+		fmt.Printf("device %s revoked\n", fs.Arg(1))
+	case "rotate":
+		if fs.NArg() != 2 {
+			return fmt.Errorf("usage: mexarootd devices rotate <name>")
+		}
+		device, err := s.Rotate(fs.Arg(1))
+		if err != nil {
+			return err
+		}
+		fmt.Printf("device %s rotated, new token:\n%s\n", device.Name, device.Token)
+	default:
+		return fmt.Errorf("unknown devices command %q (want add, list, revoke or rotate)", fs.Arg(0))
+	}
+	return nil
 }
 
 func printTokenCommand(opts options) error {
@@ -168,9 +253,22 @@ func acquireWakeLock(styler ui.Styler) func() {
 }
 
 func serveContext(opts options, ctx context.Context) error {
-	token, err := loadToken(opts.tokenFile)
-	if err != nil {
-		return err
+	token, tokenErr := loadToken(opts.tokenFile)
+	var devices *auth.Store
+	var err error
+	if opts.devicesFile != "" {
+		devices, err = auth.OpenStore(opts.devicesFile)
+		if err != nil {
+			return err
+		}
+		// An empty shared token file is valid in device-only mode.
+		if errors.Is(tokenErr, auth.ErrEmptyToken) {
+			token = ""
+			tokenErr = nil
+		}
+	}
+	if tokenErr != nil {
+		return tokenErr
 	}
 
 	styler := ui.New(os.Stderr, opts.noColor)
@@ -190,6 +288,7 @@ func serveContext(opts options, ctx context.Context) error {
 	srv, err := server.New(server.Config{
 		Addr:             opts.addr,
 		Token:            token,
+		Devices:          devices,
 		Version:          version.VersionString(),
 		Registry:         registry,
 		AllowNonLoopback: opts.allowRemote,
@@ -203,6 +302,9 @@ func serveContext(opts options, ctx context.Context) error {
 	fmt.Fprintf(os.Stderr, "\n  %s listening on %s\n\n", styler.Paint(ui.Green, "●"), styler.Bold(opts.addr))
 	if opts.auditFile != "" {
 		fmt.Fprintf(os.Stderr, "  %s audit log at %s\n", styler.Paint(ui.Green, "●"), opts.auditFile)
+	}
+	if devices != nil {
+		fmt.Fprintf(os.Stderr, "  %s per-device tokens from %s\n", styler.Paint(ui.Green, "●"), opts.devicesFile)
 	}
 	return srv.ListenAndServe(ctx)
 }

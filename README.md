@@ -125,6 +125,24 @@ First start creates a pairing token and stores it owner-only. Print it to pair a
 mexarootd -print-token
 ```
 
+**Per-device tokens.** Instead of sharing one token, give every device its own, so a lost laptop can be revoked without re-pairing the others. Start the daemon with a device store:
+
+```sh
+mexarootd -devices                  # store next to the shared token
+mexarootd -devices /path/devices.json
+```
+
+Manage devices without stopping the daemon (the file is written atomically, so the running daemon picks changes up on the next handshake):
+
+```sh
+mexarootd devices add phone         # prints the device's token — give it to that device
+mexarootd devices list
+mexarootd devices rotate phone      # new token; the old one stops working
+mexarootd devices revoke laptop     # gone immediately
+```
+
+With `-devices` set, a hello may authenticate with the shared token *or* any live device token. Drop the shared token entirely by pointing `-token-file` at an empty file — then only device tokens work. Device authentications land in the audit log as a `device_auth` event carrying the device name.
+
 Then from the PC (through an SSH tunnel — the daemon listens on `127.0.0.1:8750` and refuses anything else unless `-allow-non-loopback` is set):
 
 ```sh

@@ -4,12 +4,15 @@ import (
 	"context"
 	"errors"
 	"net/http/httptest"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/coder/websocket"
 
+	"github.com/boy-offi9-inc/mexaroot/internal/auth"
 	"github.com/boy-offi9-inc/mexaroot/internal/runtimes"
 	"github.com/boy-offi9-inc/mexaroot/internal/runtimes/native"
 	"github.com/boy-offi9-inc/mexaroot/internal/wire"
@@ -32,12 +35,26 @@ func newTestRegistry(t *testing.T) *runtimes.Registry {
 
 func newTestServer(t *testing.T) string {
 	t.Helper()
-	srv, err := New(Config{
+	return newTestServerConfig(t, Config{
 		Addr:     "127.0.0.1:0",
 		Token:    testToken,
 		Version:  "test",
 		Registry: newTestRegistry(t),
 	})
+}
+
+func newTestServerConfig(t *testing.T, cfg Config) string {
+	t.Helper()
+	if cfg.Registry == nil {
+		cfg.Registry = newTestRegistry(t)
+	}
+	if cfg.Addr == "" {
+		cfg.Addr = "127.0.0.1:0"
+	}
+	if cfg.Version == "" {
+		cfg.Version = "test"
+	}
+	srv, err := New(cfg)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -265,4 +282,71 @@ func TestNewRequiresLoopback(t *testing.T) {
 	if _, err := New(cfg); err != nil {
 		t.Errorf("New with AllowNonLoopback: %v", err)
 	}
+}
+
+func TestHandshakeWithDeviceToken(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("0600 permissions are a Unix concept")
+	}
+	store, err := auth.OpenStore(filepath.Join(t.TempDir(), "devices.json"))
+	if err != nil {
+		t.Fatalf("OpenStore: %v", err)
+	}
+	device, err := store.Create("phone")
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	url := newTestServerConfig(t, Config{Token: testToken, Devices: store})
+	ctx, conn := dial(t, url)
+	resp := call(ctx, t, conn, wire.TypeHello, hello(device.Token, wire.Version))
+	if resp.OK == nil || !*resp.OK {
+		t.Fatalf("device token handshake failed: %+v", resp.Error)
+	}
+}
+
+func TestDeviceOnlyServerRejectsSharedToken(t *testing.T) {
+	store, err := auth.OpenStore(filepath.Join(t.TempDir(), "devices.json"))
+	if err != nil {
+		t.Fatalf("OpenStore: %v", err)
+	}
+	device, err := store.Create("phone")
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	// No shared token at all: only device tokens work.
+	url := newTestServerConfig(t, Config{Devices: store})
+	ctx, conn := dial(t, url)
+	resp := call(ctx, t, conn, wire.TypeHello, hello(testToken, wire.Version))
+	expectError(t, resp, wire.CodeUnauthorized)
+	expectClosed(ctx, t, conn)
+
+	ctx2, conn2 := dial(t, url)
+	resp2 := call(ctx2, t, conn2, wire.TypeHello, hello(device.Token, wire.Version))
+	if resp2.OK == nil || !*resp2.OK {
+		t.Fatalf("device token rejected on device-only server: %+v", resp2.Error)
+	}
+}
+
+func TestDeviceTokenRevocation(t *testing.T) {
+	store, err := auth.OpenStore(filepath.Join(t.TempDir(), "devices.json"))
+	if err != nil {
+		t.Fatalf("OpenStore: %v", err)
+	}
+	device, err := store.Create("phone")
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	url := newTestServerConfig(t, Config{Devices: store})
+	ctx, conn := dial(t, url)
+	resp := call(ctx, t, conn, wire.TypeHello, hello(device.Token, wire.Version))
+	if resp.OK == nil || !*resp.OK {
+		t.Fatalf("handshake failed before revoke: %+v", resp.Error)
+	}
+	if err := store.Revoke("phone"); err != nil {
+		t.Fatalf("Revoke: %v", err)
+	}
+	ctx2, conn2 := dial(t, url)
+	resp2 := call(ctx2, t, conn2, wire.TypeHello, hello(device.Token, wire.Version))
+	expectError(t, resp2, wire.CodeUnauthorized)
+	expectClosed(ctx2, t, conn2)
 }

@@ -19,7 +19,7 @@ import (
 // AuditEntry is one JSON Lines record. `Time` is RFC 3339 in UTC.
 type AuditEntry struct {
 	Time     string   `json:"time"`
-	Event    string   `json:"event"` // "connect" | "auth_failed" | "exec" | "session_start" | "disconnect"
+	Event    string   `json:"event"` // "connect" | "auth_failed" | "device_auth" | "exec" | "session_start" | "disconnect"
 	RemoteIP string   `json:"remote_ip,omitempty"`
 	Runtime  string   `json:"runtime,omitempty"`
 	Detail   string   `json:"detail,omitempty"`

@@ -34,6 +34,11 @@ func DefaultPath() (string, error) {
 	return filepath.Join(dir, "mexaroot", "token"), nil
 }
 
+// ErrEmptyToken reports a token file that exists but holds no token.
+// With per-device tokens enabled, an empty shared token file is a valid
+// way to run device-only.
+var ErrEmptyToken = errors.New("token file is empty")
+
 func Load(path string) (string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -41,7 +46,7 @@ func Load(path string) (string, error) {
 	}
 	token := strings.TrimSpace(string(data))
 	if token == "" {
-		return "", fmt.Errorf("token file %s is empty", path)
+		return "", fmt.Errorf("%w: %s", ErrEmptyToken, path)
 	}
 	return token, nil
 }

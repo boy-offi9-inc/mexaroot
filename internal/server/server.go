@@ -43,6 +43,11 @@ type Config struct {
 	// ForwardAllow lists hostnames or IPs the forward capability may dial.
 	// "*" permits any target. Empty restricts forwarding to loopback.
 	ForwardAllow []string
+	// Devices holds per-device tokens (optional). When set, a hello may
+	// authenticate with either the shared Token or any live device token;
+	// the matched device name lands in the audit trail. Token may then be
+	// empty, disabling the shared token entirely.
+	Devices *auth.Store
 	// DetachGrace is how long a session survives without a connection
 	// after its owner disconnects. Zero uses DefaultDetachGrace.
 	DetachGrace time.Duration
@@ -57,7 +62,7 @@ type Server struct {
 }
 
 func New(cfg Config) (*Server, error) {
-	if cfg.Token == "" {
+	if cfg.Token == "" && cfg.Devices == nil {
 		return nil, ErrNoToken
 	}
 	if cfg.Registry == nil {
@@ -275,7 +280,11 @@ func (c *connection) handshake(ctx context.Context) bool {
 		c.conn.Close(websocket.StatusPolicyViolation, "invalid handshake")
 		return false
 	}
-	if !auth.Equal(req.Token, c.server.cfg.Token) {
+	device, deviceOK := auth.Device{}, false
+	if c.server.cfg.Devices != nil {
+		device, deviceOK = c.server.cfg.Devices.Verify(req.Token)
+	}
+	if !deviceOK && !auth.Equal(req.Token, c.server.cfg.Token) {
 		c.server.limiter.recordFailure(c.remoteIP)
 		c.server.audit.write(AuditEntry{Event: "auth_failed", RemoteIP: hostOf(c.remoteIP)})
 		c.reject(ctx, msg, wire.CodeUnauthorized, "invalid token")
@@ -298,6 +307,9 @@ func (c *connection) handshake(ctx context.Context) bool {
 		return false
 	}
 	c.server.limiter.success(c.remoteIP)
+	if deviceOK {
+		c.server.audit.write(AuditEntry{Event: "device_auth", RemoteIP: hostOf(c.remoteIP), Detail: device.Name})
+	}
 	c.send(ctx, resp)
 	return true
 }

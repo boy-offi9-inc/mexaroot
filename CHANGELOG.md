@@ -8,6 +8,12 @@ version bumps.
 ## Unreleased
 
 ### Added
+- Per-device tokens: `mexarootd -devices` enables a device token store and
+  `mexarootd devices add|list|revoke|rotate` manages it without stopping the
+  daemon. A hello may authenticate with the shared token or any live device
+  token; pointing `-token-file` at an empty file runs device-only. Device
+  authentications appear in the audit log as `device_auth` events with the
+  device name.
 
 - Port forwarding: `mexaroot forward LOCAL_PORT HOST PORT` relays local TCP
   connections to a host reachable from the daemon device, over the same
