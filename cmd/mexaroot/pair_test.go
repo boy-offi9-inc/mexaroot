@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"runtime"
 	"testing"
 )
 
@@ -35,6 +36,9 @@ func TestPairEndpoint(t *testing.T) {
 }
 
 func TestSaveTokenFile(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("owner-only file modes are a Unix concept; Windows reports 0666")
+	}
 	dir := t.TempDir()
 	path := dir + "/nested/token"
 	if err := saveTokenFile(path, "tok"); err != nil {
