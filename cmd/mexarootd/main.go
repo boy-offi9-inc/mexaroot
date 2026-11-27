@@ -116,17 +116,24 @@ func devicesPath(path string) (string, error) {
 
 // devicesCommand manages per-device tokens without starting the daemon:
 //
-//	mexarootd devices add <name>
+//	mexarootd devices add <name> [-capabilities a,b | -all]
+//	mexarootd devices set <name> [-capabilities a,b | -all]
 //	mexarootd devices list
 //	mexarootd devices revoke <name>
 //	mexarootd devices rotate <name>
+//
+// New devices start read-only (they may list runtimes and sessions but run
+// nothing) — the ttyd lesson. Grant capabilities explicitly.
 func devicesCommand(args []string) error {
 	fs := flag.NewFlagSet("mexarootd devices", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	path := fs.String("devices", "", "path to the per-device token store (default: next to the shared token)")
-	if err := fs.Parse(args); err != nil {
+	caps := fs.String("capabilities", "", "comma-separated capabilities to grant: exec, shell, files.read, files.write, forward, files")
+	all := fs.Bool("all", false, "grant every capability")
+	if err := fs.Parse(flagsFirst(args, map[string]bool{"capabilities": true, "devices": true})); err != nil {
 		return err
 	}
+	_ = path
 	store, err := devicesPath(*path)
 	if err != nil {
 		return err
@@ -139,15 +146,30 @@ func devicesCommand(args []string) error {
 		return err
 	}
 	switch fs.Arg(0) {
-	case "add":
+	case "add", "set":
+		cmd := fs.Arg(0)
 		if fs.NArg() != 2 {
-			return fmt.Errorf("usage: mexarootd devices add <name>")
+			return fmt.Errorf("usage: mexarootd devices %s <name> [-capabilities a,b | -all]", cmd)
 		}
-		device, err := s.Create(fs.Arg(1))
+		caps, err := parseCapabilities(caps, all)
 		if err != nil {
 			return err
 		}
-		fmt.Printf("device %s created with token:\n%s\n", device.Name, device.Token)
+		if cmd == "add" {
+			device, err := s.Create(fs.Arg(1), caps)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("device %s created with token:\n%s\n", device.Name, device.Token)
+			printCaps(device.Capabilities)
+			return nil
+		}
+		device, err := s.SetCapabilities(fs.Arg(1), caps)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("device %s capabilities updated\n", device.Name)
+		printCaps(device.Capabilities)
 	case "list":
 		list, err := s.List()
 		if err != nil {
@@ -162,7 +184,7 @@ func devicesCommand(args []string) error {
 			if d.RotatedAt != nil {
 				rotated = fmt.Sprintf(" (rotated %s)", d.RotatedAt.Format("2006-01-02"))
 			}
-			fmt.Printf("%s  created %s%s\n", d.Name, d.CreatedAt.Format("2006-01-02"), rotated)
+			fmt.Printf("%s  created %s%s  capabilities: %s\n", d.Name, d.CreatedAt.Format("2006-01-02"), rotated, capsLabel(d.Capabilities))
 		}
 	case "revoke":
 		if fs.NArg() != 2 {
@@ -185,6 +207,52 @@ func devicesCommand(args []string) error {
 		return fmt.Errorf("unknown devices command %q (want add, list, revoke or rotate)", fs.Arg(0))
 	}
 	return nil
+}
+
+// flagsFirst hoists flag tokens ahead of positional arguments so
+// "devices add phone -capabilities exec" works — Go's flag package would
+// otherwise stop parsing at the first positional.
+func flagsFirst(args []string, valued map[string]bool) []string {
+	var flags, rest []string
+	for i := 0; i < len(args); i++ {
+		if strings.HasPrefix(args[i], "-") {
+			flags = append(flags, args[i])
+			name := strings.TrimLeft(args[i], "-")
+			if valued[name] && i+1 < len(args) {
+				i++
+				flags = append(flags, args[i])
+			}
+			continue
+		}
+		rest = append(rest, args[i])
+	}
+	return append(flags, rest...)
+}
+
+func parseCapabilities(caps *string, all *bool) ([]string, error) {
+	if all != nil && *all {
+		return auth.ExpandCapabilities([]string{auth.GroupAll})
+	}
+	if caps == nil || *caps == "" {
+		// Default: read-only. The device can connect, list runtimes and
+		// sessions, and do nothing else — grant explicitly.
+		return []string{}, nil
+	}
+	return auth.ExpandCapabilities(strings.Split(*caps, ","))
+}
+
+func capsLabel(caps []string) string {
+	if caps == nil {
+		return "full (legacy)"
+	}
+	if len(caps) == 0 {
+		return "read-only"
+	}
+	return strings.Join(caps, ",")
+}
+
+func printCaps(caps []string) {
+	fmt.Printf("capabilities: %s\n", capsLabel(caps))
 }
 
 func printTokenCommand(opts options) error {

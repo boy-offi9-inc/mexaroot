@@ -172,6 +172,10 @@ type connection struct {
 	conn     *websocket.Conn
 	wg       sync.WaitGroup
 
+	// deviceCaps is nil for shared-token connections (full access) and
+	// non-nil for per-device tokens, where it is the capability whitelist.
+	deviceCaps []string
+
 	mu         sync.Mutex
 	sessions   map[uint32]runtimes.Session
 	transfers  map[uint32]*fileTransfer
@@ -290,6 +294,9 @@ func (c *connection) handshake(ctx context.Context) bool {
 		c.reject(ctx, msg, wire.CodeUnauthorized, "invalid token")
 		return false
 	}
+	if deviceOK {
+		c.deviceCaps = device.Capabilities
+	}
 	version, ok := wire.Negotiate(req.Protocol, wire.SupportedVersions)
 	if !ok {
 		text := fmt.Sprintf("no common protocol version; supported: %v", wire.SupportedVersions)
@@ -300,7 +307,7 @@ func (c *connection) handshake(ctx context.Context) bool {
 	resp, err := wire.NewResponse(msg, wire.HelloResponse{
 		Daemon:       c.server.cfg.Version,
 		Protocol:     version,
-		Capabilities: c.server.capabilities,
+		Capabilities: c.effectiveCapabilities(),
 	})
 	if err != nil {
 		c.conn.Close(websocket.StatusInternalError, "internal error")
@@ -312,6 +319,60 @@ func (c *connection) handshake(ctx context.Context) bool {
 	}
 	c.send(ctx, resp)
 	return true
+}
+
+// deviceCapabilityFor maps a message type to the per-device capability it
+// needs. ok=false means the type is always allowed (listing, ping).
+func deviceCapabilityFor(msgType string) (string, bool) {
+	switch msgType {
+	case wire.TypeExecRun:
+		return auth.CapExec, true
+	case wire.TypeSessionStart, wire.TypeSessionAttach, wire.TypeSessionInput, wire.TypeSessionResize, wire.TypeSessionClose:
+		return auth.CapShell, true
+	case wire.TypeFilePush:
+		return auth.CapFilesWrite, true
+	case wire.TypeFilePull:
+		return auth.CapFilesRead, true
+	case wire.TypeForwardOpen, wire.TypeForwardData, wire.TypeForwardClose:
+		return auth.CapForward, true
+	}
+	return "", false
+}
+
+// effectiveCapabilities is what the hello advertises: the daemon's own
+// capability list, narrowed by a per-device whitelist when the connection
+// authenticated with a device token.
+func (c *connection) effectiveCapabilities() []string {
+	if c.deviceCaps == nil {
+		return c.server.capabilities
+	}
+	var out []string
+	for _, cap := range c.server.capabilities {
+		// The device vocabulary is finer than the protocol's: grant the
+		// coarse protocol capability if any device capability maps to it.
+		if deviceGrantedForProtocol(cap, c.deviceCaps) {
+			out = append(out, cap)
+		}
+	}
+	return out
+}
+
+// deviceGrantedForProtocol maps a coarse protocol capability (exec, session,
+// file, forward, keepalive) onto the per-device whitelist.
+func deviceGrantedForProtocol(protocolCap string, caps []string) bool {
+	switch protocolCap {
+	case wire.CapabilityExec:
+		return auth.HasCapability(caps, auth.CapExec)
+	case wire.CapabilitySession:
+		return auth.HasCapability(caps, auth.CapShell)
+	case wire.CapabilityFile:
+		return auth.HasCapability(caps, auth.CapFilesRead) || auth.HasCapability(caps, auth.CapFilesWrite)
+	case wire.CapabilityForward:
+		return auth.HasCapability(caps, auth.CapForward)
+	case wire.CapabilityKeepalive:
+		return true
+	}
+	return false
 }
 
 func (c *connection) reject(ctx context.Context, req wire.Message, code, text string) {
@@ -333,6 +394,13 @@ func (c *connection) respond(ctx context.Context, msg wire.Message) {
 	capability, known := wire.RequiredCapability(msg.Type)
 	if !known || (capability != "" && !c.server.has(capability)) {
 		c.send(ctx, wire.NewErrorResponse(msg, wire.CodeUnsupported, "unsupported message type: "+msg.Type))
+		return
+	}
+	// Per-device whitelist: finer-grained than the protocol capabilities,
+	// so file push/pull can be separated and spectator devices can list
+	// but not type.
+	if cap, needed := deviceCapabilityFor(msg.Type); c.deviceCaps != nil && needed && !auth.HasCapability(c.deviceCaps, cap) {
+		c.send(ctx, wire.NewErrorResponse(msg, wire.CodeForbidden, "device token lacks the "+cap+" capability"))
 		return
 	}
 

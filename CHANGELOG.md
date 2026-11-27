@@ -8,6 +8,11 @@ version bumps.
 ## Unreleased
 
 ### Security
+- Per-device capabilities: device tokens carry a whitelist (`exec`, `shell`,
+  `files.read`, `files.write`, `forward`) and the message router refuses
+  anything outside it with `forbidden`. New devices start read-only; the hello
+  advertises exactly what the device may use. `mexarootd devices add|set`
+  grants capabilities; existing devices keep full access until narrowed.
 - File push and pull now open every path through `os.Root`, so even a symlink
   planted inside a runtime's file system cannot redirect transfers outside the
   root. Path resolution rejects escapes before the syscall as before; the

@@ -292,7 +292,7 @@ func TestHandshakeWithDeviceToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("OpenStore: %v", err)
 	}
-	device, err := store.Create("phone")
+	device, err := store.Create("phone", nil)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -309,7 +309,7 @@ func TestDeviceOnlyServerRejectsSharedToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("OpenStore: %v", err)
 	}
-	device, err := store.Create("phone")
+	device, err := store.Create("phone", nil)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -332,7 +332,7 @@ func TestDeviceTokenRevocation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("OpenStore: %v", err)
 	}
-	device, err := store.Create("phone")
+	device, err := store.Create("phone", nil)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -349,4 +349,104 @@ func TestDeviceTokenRevocation(t *testing.T) {
 	resp2 := call(ctx2, t, conn2, wire.TypeHello, hello(device.Token, wire.Version))
 	expectError(t, resp2, wire.CodeUnauthorized)
 	expectClosed(ctx2, t, conn2)
+}
+
+func TestDeviceCapabilitiesEnforced(t *testing.T) {
+	store, err := auth.OpenStore(filepath.Join(t.TempDir(), "devices.json"))
+	if err != nil {
+		t.Fatalf("OpenStore: %v", err)
+	}
+	// Read-only device: no exec, no shell, no files, no forward.
+	spectator, err := store.Create("spectator", []string{})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	url := newTestServerConfig(t, Config{Devices: store})
+	ctx, conn := dial(t, url)
+	resp := call(ctx, t, conn, wire.TypeHello, hello(spectator.Token, wire.Version))
+	if resp.OK == nil || !*resp.OK {
+		t.Fatalf("spectator handshake failed: %+v", resp.Error)
+	}
+	var payload wire.HelloResponse
+	if err := resp.DecodePayload(&payload); err != nil {
+		t.Fatalf("DecodePayload: %v", err)
+	}
+	// keepalive is always available; everything else is withheld.
+	if len(payload.Capabilities) != 1 || payload.Capabilities[0] != wire.CapabilityKeepalive {
+		t.Fatalf("spectator must be advertised only keepalive, got %v", payload.Capabilities)
+	}
+	resp = call(ctx, t, conn, wire.TypeExecRun, wire.ExecRequest{Runtime: "testfs", Argv: []string{"true"}})
+	if resp.Error == nil || resp.Error.Code != wire.CodeForbidden {
+		t.Fatalf("spectator exec: want forbidden, got %+v", resp)
+	}
+	resp = call(ctx, t, conn, wire.TypeRuntimeList, nil)
+	if resp.OK == nil || !*resp.OK {
+		t.Fatalf("spectator runtime.list must still work: %+v", resp.Error)
+	}
+}
+
+func TestDeviceCapabilitiesGrantExec(t *testing.T) {
+	store, err := auth.OpenStore(filepath.Join(t.TempDir(), "devices.json"))
+	if err != nil {
+		t.Fatalf("OpenStore: %v", err)
+	}
+	if _, err := store.Create("runner", []string{auth.CapExec}); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	// Read the token back out of the store.
+	list, err := store.List()
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	var token string
+	for _, d := range list {
+		if d.Name == "runner" {
+			token = d.Token
+		}
+	}
+	url := newTestServerConfig(t, Config{Devices: store})
+	ctx, conn := dial(t, url)
+	resp := call(ctx, t, conn, wire.TypeHello, hello(token, wire.Version))
+	if resp.OK == nil || !*resp.OK {
+		t.Fatalf("handshake failed: %+v", resp.Error)
+	}
+	var payload wire.HelloResponse
+	if err := resp.DecodePayload(&payload); err != nil {
+		t.Fatalf("DecodePayload: %v", err)
+	}
+	if len(payload.Capabilities) != 2 || payload.Capabilities[0] != wire.CapabilityExec || payload.Capabilities[1] != wire.CapabilityKeepalive {
+		t.Fatalf("advertised capabilities: %v, want [exec keepalive]", payload.Capabilities)
+	}
+	resp = call(ctx, t, conn, wire.TypeExecRun, wire.ExecRequest{Runtime: "testfs", Argv: []string{"true"}})
+	if resp.Error != nil && resp.Error.Code == wire.CodeForbidden {
+		t.Fatal("granted exec capability was refused")
+	}
+	resp = call(ctx, t, conn, wire.TypeFilePull, wire.FilePullRequest{Runtime: "testfs", Path: "x"})
+	if resp.Error == nil || resp.Error.Code != wire.CodeForbidden {
+		t.Fatalf("ungranted file.pull: want forbidden, got %+v", resp)
+	}
+}
+
+func TestLegacyDeviceKeepsFullAccess(t *testing.T) {
+	store, err := auth.OpenStore(filepath.Join(t.TempDir(), "devices.json"))
+	if err != nil {
+		t.Fatalf("OpenStore: %v", err)
+	}
+	legacy, err := store.Create("old", nil)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	url := newTestServerConfig(t, Config{Devices: store})
+	ctx, conn := dial(t, url)
+	resp := call(ctx, t, conn, wire.TypeHello, hello(legacy.Token, wire.Version))
+	if resp.OK == nil || !*resp.OK {
+		t.Fatalf("handshake failed: %+v", resp.Error)
+	}
+	var payload wire.HelloResponse
+	if err := resp.DecodePayload(&payload); err != nil {
+		t.Fatalf("DecodePayload: %v", err)
+	}
+	if len(payload.Capabilities) == 0 {
+		t.Fatal("legacy nil-whitelist device must be advertised full capabilities")
+	}
 }

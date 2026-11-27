@@ -21,18 +21,87 @@ const (
 	DevicesFile = "devices.json"
 )
 
+// Per-device capability grants. A device whose Capabilities is nil is a
+// legacy entry with full access; a non-nil (possibly empty) list is a
+// whitelist — anything not listed is refused with CodeForbidden at the
+// message router. The ttyd lesson: read-only is the safe default.
+const (
+	CapExec       = "exec"        // non-interactive commands
+	CapShell      = "shell"       // PTY sessions (start, attach, input, resize, close)
+	CapFilesRead  = "files.read"  // file pull
+	CapFilesWrite = "files.write" // file push
+	CapForward    = "forward"     // port forwarding
+)
+
+// Shorthand groups accepted on the command line.
+const (
+	GroupFiles = "files" // files.read + files.write
+	GroupAll   = "all"   // everything
+)
+
 var (
 	ErrDeviceExists   = errors.New("a device with this name already exists")
 	ErrDeviceNotFound = errors.New("no such device")
 	ErrDeviceName     = errors.New("device name must be 1-64 characters: letters, digits, '-', '_', '.' or space")
+	ErrDeviceCap      = errors.New("unknown capability (want exec, shell, files.read, files.write, forward, files or all)")
 )
+
+// AllCapabilities lists every granular capability a device can hold.
+func AllCapabilities() []string {
+	return []string{CapExec, CapShell, CapFilesRead, CapFilesWrite, CapForward}
+}
+
+// ExpandCapabilities turns CLI names (including the "files" and "all"
+// shorthands) into granular capabilities, preserving order.
+func ExpandCapabilities(names []string) ([]string, error) {
+	var out []string
+	add := func(cap string) {
+		for _, existing := range out {
+			if existing == cap {
+				return
+			}
+		}
+		out = append(out, cap)
+	}
+	for _, name := range names {
+		switch name {
+		case GroupAll:
+			for _, c := range AllCapabilities() {
+				add(c)
+			}
+		case GroupFiles:
+			add(CapFilesRead)
+			add(CapFilesWrite)
+		case CapExec, CapShell, CapFilesRead, CapFilesWrite, CapForward:
+			add(name)
+		default:
+			return nil, fmt.Errorf("%w: %q", ErrDeviceCap, name)
+		}
+	}
+	return out, nil
+}
+
+// HasCapability reports whether a whitelist grants cap. A nil list is a
+// legacy full-access device.
+func HasCapability(caps []string, cap string) bool {
+	if caps == nil {
+		return true
+	}
+	for _, c := range caps {
+		if c == cap {
+			return true
+		}
+	}
+	return false
+}
 
 // Device is one paired peer in the store.
 type Device struct {
-	Name      string     `json:"name"`
-	Token     string     `json:"token"`
-	CreatedAt time.Time  `json:"createdAt"`
-	RotatedAt *time.Time `json:"rotatedAt,omitempty"`
+	Name         string     `json:"name"`
+	Token        string     `json:"token"`
+	Capabilities []string   `json:"capabilities"` // nil = legacy full access
+	CreatedAt    time.Time  `json:"createdAt"`
+	RotatedAt    *time.Time `json:"rotatedAt,omitempty"`
 }
 
 // devicesFile is the on-disk shape.
@@ -137,8 +206,9 @@ func (s *Store) load() (devicesFile, error) {
 	return *file, nil
 }
 
-// Create mints a token for a new device. The name must be unique.
-func (s *Store) Create(name string) (Device, error) {
+// Create mints a token for a new device. The name must be unique; caps is
+// the capability whitelist (nil = legacy full access, empty = read-only).
+func (s *Store) Create(name string, caps []string) (Device, error) {
 	if !validName(name) {
 		return Device{}, ErrDeviceName
 	}
@@ -157,7 +227,7 @@ func (s *Store) Create(name string) (Device, error) {
 	if err != nil {
 		return Device{}, err
 	}
-	device := Device{Name: name, Token: token, CreatedAt: time.Now().UTC().Truncate(time.Second)}
+	device := Device{Name: name, Token: token, Capabilities: caps, CreatedAt: time.Now().UTC().Truncate(time.Second)}
 	file.Devices = append(file.Devices, device)
 	if err := writeDevices(s.path, file); err != nil {
 		return Device{}, err
@@ -225,6 +295,29 @@ func (s *Store) Rotate(name string) (Device, error) {
 			now := time.Now().UTC().Truncate(time.Second)
 			file.Devices[i].Token = token
 			file.Devices[i].RotatedAt = &now
+			if err := writeDevices(s.path, file); err != nil {
+				return Device{}, err
+			}
+			return file.Devices[i], nil
+		}
+	}
+	return Device{}, ErrDeviceNotFound
+}
+
+// SetCapabilities replaces a device's whitelist (nil = full access).
+func (s *Store) SetCapabilities(name string, caps []string) (Device, error) {
+	if !validName(name) {
+		return Device{}, ErrDeviceName
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	file, err := s.load()
+	if err != nil {
+		return Device{}, err
+	}
+	for i := range file.Devices {
+		if file.Devices[i].Name == name {
+			file.Devices[i].Capabilities = caps
 			if err := writeDevices(s.path, file); err != nil {
 				return Device{}, err
 			}

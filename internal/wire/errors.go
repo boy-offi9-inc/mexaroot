@@ -2,6 +2,7 @@ package wire
 
 const (
 	CodeUnauthorized   = "unauthorized"
+	CodeForbidden      = "forbidden"
 	CodeUnsupported    = "unsupported"
 	CodeInvalidRequest = "invalid_request"
 	CodeNotFound       = "not_found"

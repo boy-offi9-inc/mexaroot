@@ -135,11 +135,16 @@ mexarootd -devices /path/devices.json
 Manage devices without stopping the daemon (the file is written atomically, so the running daemon picks changes up on the next handshake):
 
 ```sh
-mexarootd devices add phone         # prints the device's token — give it to that device
+mexarootd devices add phone                        # read-only: list runtimes and sessions, nothing else
+mexarootd devices add laptop -capabilities exec,files
+mexarootd devices add workhorse -all               # everything
+mexarootd devices set laptop -capabilities shell   # grant or narrow later
 mexarootd devices list
-mexarootd devices rotate phone      # new token; the old one stops working
-mexarootd devices revoke laptop     # gone immediately
+mexarootd devices rotate phone                     # new token; the old one stops working
+mexarootd devices revoke laptop                    # gone immediately
 ```
+
+**Capabilities.** New devices start **read-only** — they may connect, list runtimes and sessions, and do nothing else (the ttyd lesson: safe is the default, power is opt-in). Grant explicitly: `exec` (run commands), `shell` (PTY sessions), `files.read` / `files.write` (pull / push), `forward` (port forwarding), with the `files` shorthand for both and `-all` for everything. The hello response advertises only what the device may use, and anything outside the whitelist answers `forbidden`. Devices created before capabilities existed keep full access until you run `devices set` on them.
 
 With `-devices` set, a hello may authenticate with the shared token *or* any live device token. Drop the shared token entirely by pointing `-token-file` at an empty file — then only device tokens work. Device authentications land in the audit log as a `device_auth` event carrying the device name.
 

@@ -19,7 +19,7 @@ func testStore(t *testing.T) *Store {
 
 func TestDevicesCreateAndVerify(t *testing.T) {
 	s := testStore(t)
-	first, err := s.Create("phone")
+	first, err := s.Create("phone", nil)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -37,10 +37,10 @@ func TestDevicesCreateAndVerify(t *testing.T) {
 
 func TestDevicesDuplicateNameRejected(t *testing.T) {
 	s := testStore(t)
-	if _, err := s.Create("phone"); err != nil {
+	if _, err := s.Create("phone", nil); err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	if _, err := s.Create("phone"); !errors.Is(err, ErrDeviceExists) {
+	if _, err := s.Create("phone", nil); !errors.Is(err, ErrDeviceExists) {
 		t.Fatalf("want ErrDeviceExists, got %v", err)
 	}
 	// The failed create must not have corrupted the store.
@@ -53,12 +53,12 @@ func TestDevicesDuplicateNameRejected(t *testing.T) {
 func TestDevicesNames(t *testing.T) {
 	s := testStore(t)
 	for _, name := range []string{"", "with\nnewline", "emoji😀", string(make([]byte, 65))} {
-		if _, err := s.Create(name); !errors.Is(err, ErrDeviceName) {
+		if _, err := s.Create(name, nil); !errors.Is(err, ErrDeviceName) {
 			t.Fatalf("name %q: want ErrDeviceName, got %v", name, err)
 		}
 	}
 	for _, name := range []string{"laptop", "Pixel-7", "a.b_c d", strings.Repeat("a", 64)} {
-		if _, err := s.Create(name); err != nil {
+		if _, err := s.Create(name, nil); err != nil {
 			t.Fatalf("valid name %q rejected: %v", name, err)
 		}
 	}
@@ -66,7 +66,7 @@ func TestDevicesNames(t *testing.T) {
 
 func TestDevicesRevoke(t *testing.T) {
 	s := testStore(t)
-	device, err := s.Create("phone")
+	device, err := s.Create("phone", nil)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -86,7 +86,7 @@ func TestDevicesRevoke(t *testing.T) {
 
 func TestDevicesRotate(t *testing.T) {
 	s := testStore(t)
-	device, err := s.Create("phone")
+	device, err := s.Create("phone", nil)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -118,9 +118,9 @@ func TestDevicesListOrderAndPersistence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("OpenStore: %v", err)
 	}
-	a, _ := s.Create("alpha")
-	b, _ := s.Create("beta")
-	c, _ := s.Create("gamma")
+	a, _ := s.Create("alpha", nil)
+	b, _ := s.Create("beta", nil)
+	c, _ := s.Create("gamma", nil)
 
 	// A second handle on the same file sees everything.
 	reopened, err := OpenStore(path)
@@ -155,7 +155,7 @@ func TestDevicesFilePermissions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("OpenStore: %v", err)
 	}
-	if _, err := s.Create("phone"); err != nil {
+	if _, err := s.Create("phone", nil); err != nil {
 		t.Fatalf("Create: %v", err)
 	}
 	info, err := os.Stat(path)
@@ -186,5 +186,58 @@ func TestDevicesGarbageFileRejected(t *testing.T) {
 	if err == nil {
 		_ = s
 		t.Fatal("garbage devices file must be refused")
+	}
+}
+
+func TestDevicesCapabilitiesExpand(t *testing.T) {
+	caps, err := ExpandCapabilities([]string{"files", "exec", "files"})
+	if err != nil {
+		t.Fatalf("ExpandCapabilities: %v", err)
+	}
+	want := []string{CapFilesRead, CapFilesWrite, CapExec}
+	if len(caps) != len(want) {
+		t.Fatalf("got %v, want %v", caps, want)
+	}
+	for i := range want {
+		if caps[i] != want[i] {
+			t.Fatalf("got %v, want %v", caps, want)
+		}
+	}
+	if _, err := ExpandCapabilities([]string{"teleport"}); !errors.Is(err, ErrDeviceCap) {
+		t.Fatalf("unknown capability: want ErrDeviceCap, got %v", err)
+	}
+	caps, err = ExpandCapabilities([]string{GroupAll})
+	if err != nil || len(caps) != len(AllCapabilities()) {
+		t.Fatalf("all: %v, %d caps", err, len(caps))
+	}
+}
+
+func TestDevicesCapabilitiesStoreRoundTrip(t *testing.T) {
+	s := testStore(t)
+	ro, err := s.Create("spectator", []string{})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if ro.Capabilities == nil || len(ro.Capabilities) != 0 {
+		t.Fatalf("read-only device must carry an empty non-nil list: %v", ro.Capabilities)
+	}
+	if HasCapability(ro.Capabilities, "anything") {
+		t.Fatal("empty whitelist must grant nothing")
+	}
+	full, _ := s.Create("legacy", nil)
+	if !HasCapability(full.Capabilities, CapShell) {
+		t.Fatal("nil whitelist means legacy full access")
+	}
+	if _, err := s.SetCapabilities("spectator", []string{CapShell}); err != nil {
+		t.Fatalf("SetCapabilities: %v", err)
+	}
+	list, _ := s.List()
+	for _, d := range list {
+		if d.Name == "spectator" && (len(d.Capabilities) != 1 || d.Capabilities[0] != CapShell) {
+			t.Fatalf("capabilities not persisted: %+v", d)
+		}
+	}
+	if _, err := s.SetCapabilities("nope", []string{}); !errors.Is(err, ErrDeviceNotFound) {
+		t.Fatalf("set unknown: %v", err)
 	}
 }
