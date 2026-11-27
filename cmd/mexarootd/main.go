@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/boy-offi9-inc/mexaroot/internal/auth"
 	"github.com/boy-offi9-inc/mexaroot/internal/keepalive"
@@ -18,6 +19,8 @@ import (
 	"github.com/boy-offi9-inc/mexaroot/internal/runtimes/native"
 	"github.com/boy-offi9-inc/mexaroot/internal/runtimes/prootdistro"
 	"github.com/boy-offi9-inc/mexaroot/internal/runtimes/proroot"
+	qrcode "github.com/skip2/go-qrcode"
+
 	"github.com/boy-offi9-inc/mexaroot/internal/server"
 	"github.com/boy-offi9-inc/mexaroot/internal/ui"
 	"github.com/boy-offi9-inc/mexaroot/internal/version"
@@ -34,6 +37,11 @@ type options struct {
 	noColor      bool
 	wakeLock     bool
 	auditFile    string
+	pair         bool
+	pairName     string
+	pairCaps     string
+	pairAll      bool
+	pairTTL      time.Duration
 }
 
 func parseOptions(argv []string) (options, error) {
@@ -51,6 +59,11 @@ func parseOptions(argv []string) (options, error) {
 	flag.BoolVar(&opts.noColor, "no-color", false, "disable colored output")
 	flag.BoolVar(&opts.wakeLock, "wake-lock", true, "hold a Termux wake lock while running")
 	flag.StringVar(&opts.auditFile, "audit-log", "", "append a JSON Lines audit log of connections and executed commands to this file (off by default)")
+	flag.BoolVar(&opts.pair, "pair", false, "print a pairing offer (QR + URI) for a new device and start the daemon")
+	flag.StringVar(&opts.pairName, "pair-name", "", "device name suggested in the pairing offer (default: the client's choice)")
+	flag.StringVar(&opts.pairCaps, "pair-caps", "", "capabilities to grant the paired device: exec, shell, files.read, files.write, forward, files (default: read-only)")
+	flag.BoolVar(&opts.pairAll, "pair-all", false, "grant the paired device every capability")
+	flag.DurationVar(&opts.pairTTL, "pair-ttl", server.DefaultPairTTL, "how long the pairing offer stays valid")
 	printToken := flag.Bool("print-token", false, "print the pairing token and exit")
 	installService := flag.Bool("install-service", false, "install a termux-services service and exit")
 	uninstallService := flag.Bool("uninstall-service", false, "remove the termux-services service and exit")
@@ -322,6 +335,13 @@ func acquireWakeLock(styler ui.Styler) func() {
 
 func serveContext(opts options, ctx context.Context) error {
 	token, tokenErr := loadToken(opts.tokenFile)
+	if opts.pair && opts.devicesFile == "" {
+		defaultDevices, err := auth.DefaultDevicesPath()
+		if err != nil {
+			return err
+		}
+		opts.devicesFile = defaultDevices
+	}
 	var devices *auth.Store
 	var err error
 	if opts.devicesFile != "" {
@@ -374,7 +394,47 @@ func serveContext(opts options, ctx context.Context) error {
 	if devices != nil {
 		fmt.Fprintf(os.Stderr, "  %s per-device tokens from %s\n", styler.Paint(ui.Green, "●"), opts.devicesFile)
 	}
+	if opts.pair {
+		if err := printPairOffer(srv, opts, styler); err != nil {
+			return err
+		}
+	}
 	return srv.ListenAndServe(ctx)
+}
+
+// printPairOffer renders the pairing offer: QR block, then the same URI as
+// plain text for copy-paste. Scan if you can, paste if you can't.
+func printPairOffer(srv *server.Server, opts options, styler ui.Styler) error {
+	caps, err := parsePairCapabilities(opts)
+	if err != nil {
+		return err
+	}
+	name := opts.pairName // may be empty; the client names itself on consume
+	uri, err := srv.CreatePairOffer(server.NormalizePairHost(opts.addr), name, caps, opts.pairTTL)
+	if err != nil {
+		return fmt.Errorf("create pairing offer: %w", err)
+	}
+	qr, err := qrcode.New(uri, qrcode.Medium)
+	if err != nil {
+		return fmt.Errorf("render QR: %w", err)
+	}
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, styler.Bold("Pairing offer — scan with the device you want to add:"))
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, qr.ToSmallString(false))
+	fmt.Fprintf(os.Stderr, "  or paste this on the client:\n\n    mexaroot pair %s\n", uri)
+	fmt.Fprintf(os.Stderr, "\n  expires in %s, single use, grants: %s\n", opts.pairTTL, capsLabel(caps))
+	return nil
+}
+
+func parsePairCapabilities(opts options) ([]string, error) {
+	if opts.pairAll {
+		return auth.ExpandCapabilities([]string{auth.GroupAll})
+	}
+	if opts.pairCaps == "" {
+		return []string{}, nil // read-only default
+	}
+	return auth.ExpandCapabilities(strings.Split(opts.pairCaps, ","))
 }
 
 func serve(opts options) error {

@@ -35,7 +35,7 @@ tracks what is open and the order to take it in.
 Today there is one shared token, a manual copy step and an SSH tunnel for
 remote use.
 
-- [ ] Pairing flow: `mexarootd -pair` shows a QR code or URI that encodes the address and a one-time secret, and the client saves a named host
+- [x] Pairing flow: `mexarootd -pair` prints a QR code and the same offer as a `mexaroot://pair?…` URI; the client runs `mexaroot pair <uri>`, which consumes the single-use, TTL-bound 128-bit-class secret over the normal listener and saves the minted device token (scoped to the capabilities chosen at `-pair`) as its default token. Design discussed in #4 (2026-11-28)
 - [x] Per-device tokens with listing, revocation and rotation - shipped: `internal/auth/devices.go` store (atomic 0600 JSON, name uniqueness, constant-time verify), `mexarootd -devices` enables the store, `mexarootd devices add|list|revoke|rotate` manages it without stopping the daemon, server accepts shared or device tokens (device-only possible by emptying the shared token file), `device_auth` audit events name the device (2026-11-27)
 - [ ] Built-in TLS with a pinned certificate fingerprint, as an alternative to the SSH tunnel
 - [x] Remove the need for `-token` on the command line - the env var and `-token-file` have existed for a while; the README now actively recommends them over `-token` (2026-11-25)

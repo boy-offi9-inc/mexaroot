@@ -148,6 +148,21 @@ mexarootd devices revoke laptop                    # gone immediately
 
 With `-devices` set, a hello may authenticate with the shared token *or* any live device token. Drop the shared token entirely by pointing `-token-file` at an empty file — then only device tokens work. Device authentications land in the audit log as a `device_auth` event carrying the device name.
 
+**Pairing a new device.** On the daemon, print an offer (QR + URI, single use, expires):
+
+```sh
+mexarootd -pair                            # read-only device
+mexarootd -pair -pair-caps exec,shell      # or grant more up front
+```
+
+On the new device, scan the QR or paste the URI:
+
+```sh
+mexaroot pair mexaroot://pair?host=…&secret=…    # saves the token as this machine's default
+```
+
+The offer carries a 128-bit-class single-use secret — not a PIN — so there is nothing to brute-force. The paired token lands in the normal device store, scoped to the capabilities you chose, revocable and rotatable like any other.
+
 Then from the PC (through an SSH tunnel — the daemon listens on `127.0.0.1:8750` and refuses anything else unless `-allow-non-loopback` is set):
 
 ```sh

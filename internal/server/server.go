@@ -59,6 +59,7 @@ type Server struct {
 	limiter      *handshakeLimiter
 	audit        *auditLog
 	resume       *sessionRegistry
+	pair         *pairManager
 }
 
 func New(cfg Config) (*Server, error) {
@@ -81,6 +82,7 @@ func New(cfg Config) (*Server, error) {
 	registry.start()
 	return &Server{
 		cfg:     cfg,
+		pair:    newPairManager(),
 		limiter: newHandshakeLimiter(),
 		audit:   audit,
 		resume:  registry,
@@ -97,6 +99,7 @@ func New(cfg Config) (*Server, error) {
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", s.handleWebSocket)
+	mux.HandleFunc("/pair", s.handlePair)
 	return mux
 }
 

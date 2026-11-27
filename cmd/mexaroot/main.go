@@ -97,6 +97,8 @@ func run(opts options, fs *flag.FlagSet, args []string, out, errOut ui.Styler) (
 	switch name {
 	case "completion":
 		return completionCommand(args[1:], fs)
+	case "pair":
+		return pairCommand(ctx, args[1:], out, errOut)
 	case "doctor":
 		return doctorCommand(ctx, opts, out)
 	}

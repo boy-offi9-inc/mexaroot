@@ -180,6 +180,11 @@ func writeDevices(path string, file devicesFile) error {
 	return nil
 }
 
+// ValidDeviceName reports whether name is acceptable for the store.
+func ValidDeviceName(name string) bool {
+	return validName(name)
+}
+
 func validName(name string) bool {
 	if len(name) == 0 || len(name) > 64 {
 		return false

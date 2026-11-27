@@ -22,6 +22,12 @@ version bumps.
   contents) instead of the org default.
 
 ### Added
+- Pairing flow: `mexarootd -pair` prints a QR code plus the same offer as a
+  `mexaroot://pair?host=…&secret=…` URI. `mexaroot pair <uri>` consumes the
+  offer (single use, TTL-bound, constant-time checked) and saves the minted,
+  capability-scoped device token as the client's default. Pairing
+  consumption and failures are audit-logged; the secret never appears in
+  logs.
 - Per-device tokens: `mexarootd -devices` enables a device token store and
   `mexarootd devices add|list|revoke|rotate` manages it without stopping the
   daemon. A hello may authenticate with the shared token or any live device
